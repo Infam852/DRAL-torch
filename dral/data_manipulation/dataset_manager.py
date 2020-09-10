@@ -4,9 +4,9 @@ import torch
 
 from dral.data_manipulation.loader import DataLoader
 from dral.utils import check_dtype
-from dral.logger import get_logger
+from dral.logger import Logger
 
-LOG = get_logger()
+LOG = Logger.get_logger()
 
 
 def init_dm(x_path, y_path, img_size, n_train, n_eval, n_test):

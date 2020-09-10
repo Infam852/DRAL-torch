@@ -7,8 +7,9 @@ import torch.optim as optim
 import torch.nn as nn
 
 from models import ConvNet
-from data_manipulation.loader import DataLoader, CONFIG
-from utils import show_img
+from data_manipulation.loader import DataLoader
+from dral.config import CONFIG
+from utils import show_img, show_grid_imgs
 
 
 """ Train convnet and then save the model """
@@ -17,21 +18,26 @@ IMG_SIZE = CONFIG['img_size']
 
 # x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_train_cats_dogs.npy'))
 # y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_train_cats_dogs.npy'))
-x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_cats_dogs_skimage.npy'))
-y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_cats_dogs_skimage.npy'))
+# x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_cats_dogs_skimage.npy'))
+# y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_cats_dogs_skimage.npy'))
+
+x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_rps_skimage.npy'))
+y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_rps_skimage.npy'))
 
 x_train = torch.Tensor(x_train).view(-1, IMG_SIZE, IMG_SIZE)
 y_train = torch.Tensor(y_train)
 print(x_train.shape)
 print(y_train.shape)
 
-N_TRAIN = 8000
-N_EVAL = 2000
-N_TEST = 2000
+N_TRAIN = CONFIG['n_train']
+N_EVAL = CONFIG['n_eval']
+N_TEST = CONFIG['n_test']
 
 if N_TRAIN + N_EVAL + N_TEST > len(x_train):
     raise Exception('Not enough data!')
 
+
+# resnet50 works with 224, 244 input size
 net = ConvNet()
 optimizer = optim.Adam(net.parameters(), lr=1e-3)
 loss_function = nn.MSELoss()
@@ -46,8 +52,10 @@ y_test = y_train[N_EVAL:N_EVAL+N_TEST]
 x_train = x_train[N_EVAL+N_TEST:N_EVAL+N_TEST+N_TRAIN]
 y_oracle = y_train[N_EVAL+N_TEST:N_EVAL+N_TEST+N_TRAIN]
 
-EPOCHS = 30
-BATCH_SIZE = 64
+show_grid_imgs(x_train[:9], y_oracle[:9], (3, 3))
+
+EPOCHS = 8
+BATCH_SIZE = 32
 
 print('Start training')
 for epoch in range(EPOCHS):
@@ -79,4 +87,4 @@ with torch.no_grad():
 
 print("Accuracy: ", round(correct/total, 3))
 
-torch.save(net, f'{DATASETS_DICT}/cnn_model.pt')
+torch.save(net, f'{DATASETS_DICT}/cnn_rps_model.pt')

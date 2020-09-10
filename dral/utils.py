@@ -3,9 +3,9 @@ import numpy as np
 
 import torch
 
-from dral.logger import get_logger
+from dral.logger import Logger
 
-LOG = get_logger()
+LOG = Logger.get_logger()
 
 
 def check_dtype(val, *args):
@@ -26,6 +26,10 @@ def show_img(img, label=None, figsize=(4, 4)):
 
 
 def show_grid_imgs(imgs, labels, grid_size):
+    if len(imgs) != len(labels) or len(imgs) != grid_size[0]*grid_size[1]:
+        raise ValueError(
+            'Number of images, labels and grid size have to be equal.')
+
     rows, cols = grid_size
     f, axarr = plt.subplots(nrows=rows, ncols=cols)
     for idx, image in enumerate(imgs):

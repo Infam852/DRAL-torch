@@ -1,35 +1,11 @@
 import os
 import numpy as np
+
 from skimage import io
 import skimage.transform
 from tqdm import tqdm
 
-
-CONFIG = {
-    'img_size': 32,
-    'labels': {
-        'data/PetImages/Cat': 0,
-        'data/PetImages/Dog': 1
-    },
-    'n_train': 8000,
-    'n_eval': 2000,
-    'n_test': 3000,
-    'data': {
-        'x_path': 'data/x_cats_dogs_skimage.npy',
-        'y_path': 'data/y_cats_dogs_skimage.npy'
-    },
-    'max_reward': 5,
-    'max_queries': 20,
-    'query_punishment': 0.5,
-    'left_queries_punishment': 5,
-    'reward_treshold': 0.92,
-    'reward_multiplier': 4,
-}
-
-LABEL_MAPPING = {
-    0: 'Cat',
-    1: 'Dog'
-}
+from dral.config import CONFIG
 
 
 class DataLoader:
@@ -52,21 +28,20 @@ class DataLoader:
         self._reset()
         for label in self.LABELS:
             for f in tqdm(os.listdir(label)):
+                try:
+                    path = os.path.join(label, f)
+                    # as_gray converts image to float64 within [0, 1] range
+                    img = io.imread(path, as_gray=True)
+                    img = skimage.transform.resize(
+                        img, (self.IMG_SIZE, self.IMG_SIZE))
+                    self.x.append(np.array(img))
+                    # one-hot vector
+                    self.y.append(np.eye(self.NCLS)[self.LABELS[label]])
 
-                if 'jpg' in f:
-                    try:
-                        path = os.path.join(label, f)
-                        # as_gray converts image to float64 within [0, 1] range
-                        img = io.imread(path, as_gray=True)
-                        img = skimage.transform.resize(
-                            img, (self.IMG_SIZE, self.IMG_SIZE))
-                        self.x.append(np.array(img))
-                        # one-hot vector
-                        self.y.append(np.eye(self.NCLS)[self.LABELS[label]])
+                    self.balance_counter[self.LABELS[label]] += 1
+                except Exception as e:
+                    print(f'Error while processing the data: {e}')
 
-                        self.balance_counter[self.LABELS[label]] += 1
-                    except Exception as e:
-                        print(f'Error while processing the data: {e}')
         self.x = np.array(self.x)
         self.y = np.array(self.y)
         self.loaded = True
@@ -98,4 +73,4 @@ if __name__ == '__main__':
     dl.load_training_data()
     dl.shuffle()
     dl.print_balance_counter()
-    dl.save('data', 'cats_dogs_skimage')
+    dl.save('data', 'rps_skimage')

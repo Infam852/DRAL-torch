@@ -3,9 +3,10 @@ import numpy as np
 
 import gym
 from gym import spaces
+import torch
 
 from dral.utils import tensor_to_numpy_1d, LOG, round_to3
-from dral.data_manipulation.loader import LABEL_MAPPING
+from dral.config import LABEL_MAPPING, CONFIG
 
 
 class QueryEnv(gym.Env):
@@ -24,9 +25,9 @@ class QueryEnv(gym.Env):
         self.MAX_QUERIES = config['max_queries']
         self.REWARD_MULT = config['reward_multiplier']
         self.REWARD_THR = 0  # calculate_reward needs it
-        self.MAX_REWARD = self._calculate_reward([0.5, 0.5])
+        self.MAX_REWARD = self._get_max_reward(len(CONFIG['labels']))
         self.REWARD_THR = config['reward_treshold'] * self.MAX_REWARD
-        self.QUERY_PUNISH = config['query_punishemnt']
+        self.QUERY_PUNISH = config['query_punishment']
         self.LEFT_QUERIES_PUNISH = config['left_queries_punishment']
 
         LOG.info(f'max reward: {self.MAX_REWARD}, '
@@ -35,7 +36,7 @@ class QueryEnv(gym.Env):
         n_action = 2
         self.action_space = spaces.Discrete(n_action)
         self.observation_space = spaces.Box(    # binary classification
-            low=0, high=1, shape=(2,), dtype=np.float32)
+            low=0, high=1, shape=(len(CONFIG['labels']),), dtype=np.float32)
 
     def reset(self):
         """Reset all environment variables. Should be called at
@@ -51,7 +52,7 @@ class QueryEnv(gym.Env):
         self.entropy_arr = []
         self.reward_arr = []
         self._state = tensor_to_numpy_1d(self._get_state_vector())
-        self.LOG.info('environment has been reset')
+        LOG.info('reset environment')
         return self._state
 
     def step(self, action):
@@ -60,7 +61,6 @@ class QueryEnv(gym.Env):
         if action == self.QUERY_LABEL:
             self._queries += 1
             self.query_indicies.append(self._counter)
-
             reward -= self.QUERY_PUNISH
             reward += self._calculate_reward(self._state)
         elif action == self.DO_NOT_QUERY:
@@ -92,6 +92,7 @@ class QueryEnv(gym.Env):
             return out
         except Exception as ex:
             print('Aux model prediction error', ex, ex.__traceback__.tb_lineno)
+            return torch.zeros(self.observation_space.shape)
 
     def _calculate_reward(self, predictions):
         """Calculate reward based on array of predictions
@@ -113,16 +114,29 @@ class QueryEnv(gym.Env):
         """ Given numpy array, calculate entropy. Use e for the log base """
         return -sum([p*np.log(p) for p in dist if p > 0])
 
+    def _get_max_reward(self, n):
+        totally_random_dist = np.full(n, 1/n)
+        return self._calculate_reward(totally_random_dist)
+
     def render(self):
         print(f"""
         Entropy: {self.entropy}
         Probabilities
         {LABEL_MAPPING[0]}: {self._state[0]}
         {LABEL_MAPPING[1]}: {self._state[1]}
+        {LABEL_MAPPING[2]}: {self._state[2]}
         """)
 
     def get_counter(self):
         return self._counter
+
+    def get_query_indicies(self):
+        if len(self.query_indicies) < self.MAX_QUERIES:
+            LOG.warning(
+                f'Called get_query_indicies but number of queries '
+                f'({self.query_indicies}) is less than maximum number '
+                f'({self.MAX_QUERIES})')
+        return self.query_indicies
 
 
 class MonitorWrapper(gym.Wrapper):
