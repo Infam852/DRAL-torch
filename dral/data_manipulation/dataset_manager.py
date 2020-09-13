@@ -9,7 +9,14 @@ from dral.logger import Logger
 LOG = Logger.get_logger()
 
 
-def init_dm(x_path, y_path, img_size, n_train, n_eval, n_test):
+def init_dm(CONF):
+    x_path = CONF['data']['x_path']
+    y_path = CONF['data']['y_path']
+    img_size = CONF['img_size']
+    n_train = CONF['n_train']
+    n_eval = CONF['n_eval']
+    n_test = CONF['n_test']
+
     x = DataLoader.load(x_path)
     y = DataLoader.load(y_path)
 
@@ -87,6 +94,13 @@ class DatasetsManager:
     def get_y_shape(self):
         return self.y_shape
 
+    def shuffle(self):
+        pass
+
+    def reset(self):
+        # remove all labels
+        pass
+
     def __str__(self):
         msg = """
         Number of unlabelled samples: {}
@@ -113,8 +127,8 @@ class Storage:
         self.name = name
 
     def add(self, x_new, y_new):
-        self._x = np.append(self._x, x_new, axis=0)
-        self._y = np.append(self._y, y_new, axis=0)
+        self._x = torch.from_numpy(np.append(self._x, x_new, axis=0))
+        self._y = torch.from_numpy(np.append(self._y, y_new, axis=0))
 
     def remove(self, idxs):
         self._x = np.delete(self._x, idxs, axis=0)

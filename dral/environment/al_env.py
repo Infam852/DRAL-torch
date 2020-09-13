@@ -35,7 +35,7 @@ class QueryEnv(gym.Env):
 
         n_action = 2
         self.action_space = spaces.Discrete(n_action)
-        self.observation_space = spaces.Box(    # binary classification
+        self.observation_space = spaces.Box(    # softmax output
             low=0, high=1, shape=(len(CONFIG['labels']),), dtype=np.float32)
 
     def reset(self):
@@ -49,7 +49,6 @@ class QueryEnv(gym.Env):
         self._counter = 0
         self.entropy = 0
         self.query_indicies = []
-        self.entropy_arr = []
         self.reward_arr = []
         self._state = tensor_to_numpy_1d(self._get_state_vector())
         LOG.info('reset environment')

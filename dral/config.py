@@ -10,20 +10,20 @@ LABEL_MAPPING_RPS = {
 }
 
 CONFIG_PETIMAGES = {
-    'img_size': 64,
+    'img_size': 128,
     'labels': {
         'data/PetImages/Cat': 0,
         'data/PetImages/Dog': 1
     },
-    'n_train': 8000,
+    'n_train': 10000,
     'n_eval': 2000,
-    'n_test': 3000,
+    'n_test': 2000,
     'data': {
-        'x_path': 'data/x_cats_dogs_skimage.npy',
-        'y_path': 'data/y_cats_dogs_skimage.npy'
+        'x_path': 'data/x_cats_dogs_128.npy',
+        'y_path': 'data/y_cats_dogs_128.npy'
     },
     'max_reward': 5,
-    'max_queries': 1000,
+    'max_queries': 30,
     'query_punishment': 0.5,
     'left_queries_punishment': 5,
     'reward_treshold': 0.92,
@@ -41,16 +41,37 @@ CONFIG_RPS = {
     'n_eval': 500,
     'n_test': 500,
     'data': {
-        'x_path': 'data/x_rps_skimage.npy',
-        'y_path': 'data/y_rps_skimage.npy'
+        'x_path': 'data/x_rps_skimage_range255.npy',
+        'y_path': 'data/y_rps_skimage_range255.npy',
     },
     'max_reward': 5,
-    'max_queries': 20,
+    'max_queries': 30,
     'query_punishment': 0.5,
     'left_queries_punishment': 5,
     'reward_treshold': 0.7,
     'reward_multiplier': 4,
 }
 
-CONFIG = CONFIG_RPS
+CONFIG_CATS_DOGS_SMALLER = {
+    'img_size': 128,
+    'labels': {
+        'data/CatsDogs/cats': 0,
+        'data/CatsDogs/dogs': 1
+    },
+    'n_train': 4000,
+    'n_eval': 0,
+    'n_test': 1000,
+    'data': {
+        'x_path': 'data/x_cats_dogs_sm_128.npy',
+        'y_path': 'data/y_cats_dogs_sm_128.npy'
+    },
+    'max_reward': 5,
+    'max_queries': 30,
+    'query_punishment': 0.5,
+    'left_queries_punishment': 5,
+    'reward_treshold': 0.92,
+    'reward_multiplier': 4,
+}
+
+CONFIG = CONFIG_CATS_DOGS_SMALLER
 LABEL_MAPPING = LABEL_MAPPING_RPS

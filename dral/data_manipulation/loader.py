@@ -2,6 +2,7 @@ import os
 import numpy as np
 
 from skimage import io
+from skimage.color import rgb2gray
 import skimage.transform
 from tqdm import tqdm
 
@@ -24,7 +25,7 @@ class DataLoader:
         self.y = []
         self.balance_counter = {label: 0 for label in self.LABELS.values()}
 
-    def load_training_data(self):
+    def load_training_data(self, enable_normalization=True):
         self._reset()
         for label in self.LABELS:
             for f in tqdm(os.listdir(label)):
@@ -34,6 +35,9 @@ class DataLoader:
                     img = io.imread(path, as_gray=True)
                     img = skimage.transform.resize(
                         img, (self.IMG_SIZE, self.IMG_SIZE))
+                    if not enable_normalization:
+                        img = (img*256).astype('uint8')
+
                     self.x.append(np.array(img))
                     # one-hot vector
                     self.y.append(np.eye(self.NCLS)[self.LABELS[label]])
@@ -70,7 +74,7 @@ class DataLoader:
 
 if __name__ == '__main__':
     dl = DataLoader(CONFIG)
-    dl.load_training_data()
+    dl.load_training_data(enable_normalization=False)
     dl.shuffle()
     dl.print_balance_counter()
-    dl.save('data', 'rps_skimage')
+    dl.save('data', 'cats_dogs_sm_128')

@@ -3,7 +3,7 @@ import numpy as np
 
 from dral.data_manipulation.dataset_manager import init_dm
 from dral.data_manipulation.loader import CONFIG
-from dral.environment.rl_env import QueryEnv, MonitorWrapper
+from dral.environment.al_env import QueryEnv, MonitorWrapper
 from dral.models import ConvNet
 from dral.utils import load_model
 
@@ -16,7 +16,7 @@ def train_rl_model(model, timesteps, path_to_save):
     model.save(path_to_save)
 
 
-def init_and_train_rl_model(timesteps):
+def init_and_train_rl_model(timesteps, path='data/rl_rps.pth'):
     CONF = CONFIG
     dm, y_oracle = init_dm(
         x_path=CONF['data']['x_path'],
@@ -30,7 +30,7 @@ def init_and_train_rl_model(timesteps):
     env = QueryEnv(dm, cnn, CONF)
     env = MonitorWrapper(env, autolog=True)
     model = DQN(MlpPolicy, env, verbose=1)
-    train_rl_model(model, timesteps, 'data/rl_rps.pth')
+    train_rl_model(model, timesteps, path)
 
 
 def load_dqn_model(path):
@@ -78,5 +78,15 @@ def main():
 if __name__ == '__main__':
     # unpickling the model requires access to models.py
     sys.path.insert(0, 'dral')
-    main()
+    # main()
     # init_and_train_rl_model(35000)
+    CONF = CONFIG
+    dm, y_oracle = init_dm(
+        x_path=CONF['data']['x_path'],
+        y_path=CONF['data']['y_path'],
+        img_size=CONF['img_size'],
+        n_train=CONF['n_train'],
+        n_eval=CONF['n_eval'],
+        n_test=CONF['n_test']
+    )
+    print(y_oracle[0])
