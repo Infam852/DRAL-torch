@@ -69,7 +69,7 @@ def find_most_uncertain(model, imgs, n):
     """
     entropies = []
     for idx, img in enumerate(imgs):
-        probabilities = model.action_probability(img.view(128, 128, 1))
+        probabilities = model.action_probability(img.view(64, 64, 1))
         entropies.append((idx, calculate_entropy(probabilities)))
     entropies.sort(key=lambda x: x[1])
     return entropies[-n:]

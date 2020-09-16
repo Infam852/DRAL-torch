@@ -1,6 +1,7 @@
 import numpy as np
-
 import pytest
+
+from dral.data_manipulation.dataset_manager import DatasetsManager
 
 
 n_samples = 10
@@ -10,8 +11,6 @@ y_range = 5
 
 @pytest.fixture
 def dm():
-    from dral.data_manipulation.dataset_manager import DatasetsManager
-
     np.random.seed(1)
     unl = np.random.rand(n_samples, x_samples_dim)
     x_eval = np.random.rand(n_samples, x_samples_dim)

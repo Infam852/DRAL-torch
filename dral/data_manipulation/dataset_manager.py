@@ -155,6 +155,15 @@ class Storage:
             return (self._x, self._y)
         return (self._x[idx], self._y[idx])
 
+    def shuffle(self):
+        p = np.random.permutation(len(self._x))
+        self._x = self._x[p]
+        self._y = self._y[p]
+
+    def sample_xy(self, n):
+        p = np.random.permutation(n)
+        return self._x[p], self._y[p]
+
     def get_x_shape(self):
         return self._x.shape
 

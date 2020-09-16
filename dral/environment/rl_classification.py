@@ -1,17 +1,17 @@
 import sys
 import numpy as np
+from numpy.random import default_rng
 import time
 
 import gym
 from gym import spaces
 
+from stable_baselines3 import DQN
+from stable_baselines3.dqn import CnnPolicy
+
 # from stable_baselines.common.env_checker import check_env
 # from stable_baselines.deepq.policies import CnnPolicy, MlpPolicy
 # from stable_baselines import DQN, ACER, ACKTR
-
-
-from stable_baselines3 import DQN
-from stable_baselines3.dqn import CnnPolicy
 
 from dral.config import CONFIG
 from dral.utils import LOG, show_img, find_most_uncertain, show_grid_imgs, evaluate
@@ -40,6 +40,17 @@ def init_and_train_rl_classification_model(
     return model
 
 
+def label_samples(dm, y_oracle, n, random=False):
+    if random:
+        rng = default_rng()
+        idxs = rng.choice(len(dm.unl), size=n, replace=False)
+    else:
+        idxs = list(range(n))
+    dm.label_samples(idxs, y_oracle[idxs])
+    y_oracle = np.delete(y_oracle, idxs, axis=0)
+    return y_oracle
+
+
 class ClassificationEnv(gym.Env):
     # !TODO use config
     CLASS_ROCK = 0
@@ -51,6 +62,7 @@ class ClassificationEnv(gym.Env):
         self.dm = dm
         self.storage = self.dm.train
         self.img_size = CONFIG['img_size']
+        self.correct_shape = (self.img_size, self.img_size, 1)
         self._counter = 0
         self.stats = {'good': 0, 'wrong': 0}
 
@@ -64,21 +76,20 @@ class ClassificationEnv(gym.Env):
     def reset(self):
         self._counter = 0
         self.stats = {'good': 0, 'wrong': 0}
-        self._state = self.storage.get_x(self._counter).view(self.img_size, self.img_size, 1).numpy()
+        self._state = self.storage.get_x(
+            self._counter).view(*self.correct_shape).numpy()
         return self._state
 
     def step(self, action):
         reward = 0
 
         predicted_label = action
-
         true_label = np.argmax(self.storage.get_y(self._counter))
 
         LOG.debug(f'Predicted label: {predicted_label},'
                   f'true_label: {true_label}')
 
         if predicted_label == true_label:
-            # maybe add to list index of this img and do not query in the next epoch
             self.stats['good'] += 1
             reward += 1
         else:
@@ -88,10 +99,10 @@ class ClassificationEnv(gym.Env):
         info = {}
         try:
             self._state = self.storage.get_x(self._counter)\
-                              .view(self.img_size, self.img_size, 1).numpy()
+                              .view(*self.correct_shape).numpy()
             done = False
         except IndexError:
-            self._state = np.zeros((self.img_size, self.img_size, 1),
+            self._state = np.zeros(self.correct_shape,
                                    dtype=np.uint8)
             done = True
             info = self.stats
@@ -102,6 +113,9 @@ class ClassificationEnv(gym.Env):
     def enable_evaluating(self, en):  # !TODO context manager
         self.evaluating = en
         self.storage = self.dm.test if en else self.dm.train
+
+    def get_counter(self):
+        return self._counter
 
 
 if __name__ == '__main__':
@@ -114,77 +128,29 @@ if __name__ == '__main__':
     dm, y_oracle = init_dm(CONFIG)
     print(dm)
     env = ClassificationEnv(dm, y_oracle)
-    # check_env(env, warn=True)
-
-    # for k in range(10):
-    #     show_img(obs, label=env.y_oracle[env._counter])
-    #     obs, reward, done, info = env.step(2)
-    #     print(reward, env.stats)
-    # model = DQN(CnnPolicy, env, verbose=1)
-    # dm, y_oracle = init_dm(CONFIG)
-    # env = ClassificationEnv(dm, y_oracle)
-    # env = MonitorWrapper(env, autolog=True)
-    # model = DQN(CnnPolicy, env, verbose=1)
-    # model.learn(total_timesteps=5000)
-
-    # while True:
-    #     action, _states = model.predict(obs, deterministic=False)
-    #     print(model.action_probability(obs))
-    #     print(action, _states)
-
-    #     obs, reward, done, info = env.step(action)
-    #     print(obs.shape)
-    #     print(reward, done, info)
-    #     input()
-    # Load the trained agent
 
     sys.path.insert(0, 'dral')
     if new:
-        model = DQN(CnnPolicy, env, verbose=1)
+        model = DQN(CnnPolicy, env, verbose=1, learning_rate=2e-4,
+                    gamma=0.98, batch_size=32, learning_starts=3000)
     if load:
         model = DQN.load("data/rl_query_rps.pth")
     if test:
         model = init_and_train_rl_classification_model(
-            timesteps=14000, path='data/rl_query_dogs_cats.pth')
-    # print(dm.test.get_x(0))
-    for k in range(10):
-        # most_uncertain = find_most_uncertain(model, dm.unl.get_x(), 20)
-        # print(most_uncertain)
+            timesteps=100000, path='data/rl_query_dogs_cats.pth')
 
-        # get indiecies of the most uncertain images
-        # idxs = [el[0] for el in most_uncertain]
-        # print(f'Most uncertain indicies: {idxs}')
+    # show_grid_imgs(dm.test.get_x(list(range(9))), dm.test.get_y(list(range(9))), (3, 3))
+    n_episodes = 5
+    for k in range(n_episodes):
 
         # label images
-        idxs = list(range(50))
-        dm.label_samples(idxs, y_oracle[idxs])
-        y_oracle = np.delete(y_oracle, idxs, axis=0)
+        y_oracle = label_samples(dm, y_oracle, n=100, random=True)
+        dm.train.shuffle()
         print(dm)
-        # to_show = list(range(k*20, k*20+16))
-        # show_grid_imgs(dm.train.get_x(to_show), dm.train.get_y(to_show), (4, 4))
-        model.learn(total_timesteps=len(dm.train)*10)
+
+        model.learn(total_timesteps=6000, log_interval=30)
 
         # evaluation
         env.enable_evaluating(True)
         evaluate(model, env)
         env.enable_evaluating(False)
-
-    # print(y_oracle.shape)
-    # to_show = list(range(16))
-
-    # start = time.time()
-    # obs = env.reset()
-    # for k in range(1001):
-    #     action, _states = model.predict(obs)
-    #     # print(model.action_probability(obs))
-    #     # print(action, _states)
-
-    #     obs, reward, done, info = env.step(action)
-    #     if done:
-    #         print('Done')
-    #         obs = env.reset()
-
-    #     # print(reward, done, info)
-    #     # input()    # obs = env.reset()
-    # end = time.time()
-    # print(f'Time: {end - start}')

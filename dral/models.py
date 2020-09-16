@@ -28,8 +28,12 @@ class ConvNet(nn.Module):
     """
     Output layer size: W_out = (W_in - kernel + 2*padding) / stride + 1
     """
-    def __init__(self):
+    def __init__(self, n_output):
         super().__init__()
+        self.img_size = CONFIG['img_size']
+        if self.img_size % (2**3) > 0:
+            raise ValueError('Wrong image size!')
+
         self.conv1 = nn.Conv2d(1, 32, kernel_size=5, stride=1, padding=2)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=1, padding=2)
@@ -37,18 +41,20 @@ class ConvNet(nn.Module):
         self.dropout2 = nn.Dropout(0.2)
         self.dropout3 = nn.Dropout(0.3)
         # input: 32x32 -> 8x8xNchannels (2 pooling)
-        self.fc1 = nn.Linear(8*8*128, 256)
-        self.fc2 = nn.Linear(256, 3)
+        # 3 - number of pooling layers (assumption: conv layers do not change w, h)
+        dim = (self.img_size // (2**3))
+        self.fc_input_size = dim * dim * 128
+        self.fc1 = nn.Linear(self.fc_input_size, 256)
+        self.fc2 = nn.Linear(256, n_output)
 
         self.optimizer = optim.Adam(self.parameters(), lr=0.001)
         self.loss_function = nn.MSELoss()
-        self.img_size = CONFIG['img_size']
 
     def forward(self, x):
         x = self.dropout2(self.pool(F.relu(self.conv1(x))))
         x = self.dropout2(self.pool(F.relu(self.conv2(x))))
         x = self.dropout2(self.pool(F.relu(self.conv3(x))))
-        x = x.view(-1, 8*8*128)  # ! change img size change NxNx
+        x = x.view(-1,  self.fc_input_size)  # ! change img size change NxNx
         x = self.dropout2(x)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -69,9 +75,9 @@ class ConvNet(nn.Module):
         print('Accuracy: ', round(correct/total, 3))
 
     def fit(self, x, y, epochs, batch_size=8):
-        x = torch.Tensor(x)
+        x = torch.Tensor(x.float())
         x = self._correct_view(x)
-        y = torch.Tensor(y)
+        y = torch.Tensor(y.float())
         for epoch in range(epochs):
             for k in tqdm(range(0, len(x), batch_size)):
                 batch_X = self._correct_view(x[k:k+batch_size])
