@@ -7,6 +7,7 @@ import skimage.transform
 from tqdm import tqdm
 
 from dral.config import CONFIG
+from dral.utils import LOG
 
 
 class DataLoader:
@@ -44,7 +45,7 @@ class DataLoader:
 
                     self.balance_counter[self.LABELS[label]] += 1
                 except Exception as e:
-                    print(f'Error while processing the data: {e}')
+                    LOG.warning(f'Error while processing the data: {e}')
 
         self.x = np.array(self.x)
         self.y = np.array(self.y)
@@ -74,7 +75,7 @@ class DataLoader:
 
 if __name__ == '__main__':
     dl = DataLoader(CONFIG)
-    dl.load_training_data(enable_normalization=False)
+    dl.load_training_data(enable_normalization=True)
     dl.shuffle()
     dl.print_balance_counter()
-    dl.save('data', 'cats_dogs_sm_128')
+    dl.save('data', 'cats_dogs_64_norm')

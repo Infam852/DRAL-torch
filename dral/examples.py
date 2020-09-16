@@ -21,13 +21,13 @@ IMG_SIZE = CONFIG['img_size']
 # x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_cats_dogs_skimage.npy'))
 # y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_cats_dogs_skimage.npy'))
 
-x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_rps_skimage.npy'))
-y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_rps_skimage.npy'))
+# x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_rps_skimage.npy'))
+# y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_rps_skimage.npy'))
+x_train = DataLoader.load(CONFIG['data']['x_path'])
+y_train = DataLoader.load(CONFIG['data']['y_path'])
 
 x_train = torch.Tensor(x_train).view(-1, IMG_SIZE, IMG_SIZE)
 y_train = torch.Tensor(y_train)
-print(x_train.shape)
-print(y_train.shape)
 
 N_TRAIN = CONFIG['n_train']
 N_EVAL = CONFIG['n_eval']
@@ -38,7 +38,8 @@ if N_TRAIN + N_EVAL + N_TEST > len(x_train):
 
 
 # resnet50 works with 224, 244 input size
-net = ConvNet()
+n_output = 2
+net = ConvNet(n_output)
 optimizer = optim.Adam(net.parameters(), lr=1e-3)
 loss_function = nn.MSELoss()
 
@@ -52,10 +53,10 @@ y_test = y_train[N_EVAL:N_EVAL+N_TEST]
 x_train = x_train[N_EVAL+N_TEST:N_EVAL+N_TEST+N_TRAIN]
 y_oracle = y_train[N_EVAL+N_TEST:N_EVAL+N_TEST+N_TRAIN]
 
-show_grid_imgs(x_train[:9], y_oracle[:9], (3, 3))
+# show_grid_imgs(x_train[:16], y_oracle[:16], (4, 4))
 
-EPOCHS = 8
-BATCH_SIZE = 32
+EPOCHS = 10
+BATCH_SIZE = 128
 
 print('Start training')
 for epoch in range(EPOCHS):
@@ -70,7 +71,7 @@ for epoch in range(EPOCHS):
         loss.backward()
         optimizer.step()
 
-    print(f"Epoch: {epoch}. Loss: {loss}")
+    print(f'Epoch: {epoch}. Loss: {loss}')
 
 correct = 0
 total = 0
@@ -85,6 +86,6 @@ with torch.no_grad():
             correct += 1
         total += 1
 
-print("Accuracy: ", round(correct/total, 3))
+print('Accuracy: ', round(correct/total, 3))
 
 torch.save(net, f'{DATASETS_DICT}/cnn_rps_model.pt')

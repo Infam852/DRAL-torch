@@ -142,7 +142,7 @@ class MonitorWrapper(gym.Wrapper):
     def __init__(self, env, autolog=False):
         super(MonitorWrapper, self).__init__(env)
         self.reward_arr = []
-        self.Reward = namedtuple('Reward', ['idx', 'value'])
+        self.Reward = namedtuple('Reward', ['action', 'value'])
         self.observations = []
         self.autolog = True
 
@@ -155,10 +155,8 @@ class MonitorWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
 
-        if action == self.env.QUERY_LABEL:
-            self.reward_arr.append(self.Reward(
-                self.env.get_counter(),
-                round_to3(reward)))
+        self.reward_arr.append(self.Reward(
+            action, round_to3(reward)))
 
         self.observations.append(obs)
 
