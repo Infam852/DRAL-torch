@@ -1,6 +1,3 @@
-# Deep Reinforcement Active Learnig
+# Deep Reinforcement Active Learnig (temporary)
 
-### How to run
-* go to the main directory
-* export PYTHONPATH=.
-* python dral/run.py
+### WIP...
