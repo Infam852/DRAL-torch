@@ -9,6 +9,7 @@ class ConfigManager:
             raise ValueError(f'({config_name}) is not defined in config file. '
                              f'Defined configurations: {self.configurations}')
         self.config = config['cats_dogs_64']
+        self.config_name = config_name
 
     def get_dataset_name(self):
         return self.config['dataset'].get(str)
@@ -48,3 +49,6 @@ class ConfigManager:
 
     def do_strict_balance(self):
         return self.config['preprocessing']['strict_balance'].get(bool)
+
+    def get_config_name(self):
+        return self.config_name

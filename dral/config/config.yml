@@ -8,7 +8,7 @@ cats_dogs_64:
       - Dog
 
   paths:
-    imgs: ./data/CatsDogs
+    imgs: ./data/PetImages
     save: ./data/processed
 
   loader:
