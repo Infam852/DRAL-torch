@@ -1,3 +1,10 @@
+import confuse
+
+
+config = confuse.Configuration('DRAL', __name__)
+config.set_file('dral/config/config.yml')
+
+
 LABEL_MAPPING_PETS = {
     0: 'Cat',
     1: 'Dog'
