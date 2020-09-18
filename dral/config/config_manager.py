@@ -1,4 +1,9 @@
-from dral.config import config
+import confuse
+
+CONFIG_PATH = 'dral/config/config.yml'
+
+config = confuse.Configuration('DRAL', __name__)
+config.set_file(CONFIG_PATH)  # !TODO change location of file path
 
 
 class ConfigManager:
@@ -8,8 +13,11 @@ class ConfigManager:
         if config_name not in self.configurations:
             raise ValueError(f'({config_name}) is not defined in config file. '
                              f'Defined configurations: {self.configurations}')
-        self.config = config['cats_dogs_64']
+        self.config = config[config_name]
         self.config_name = config_name
+
+    def get_config(self):
+        return self.config.get()
 
     def get_dataset_name(self):
         return self.config['dataset'].get(str)
@@ -21,7 +29,7 @@ class ConfigManager:
         return self.config['general']['labels'].get(list)
 
     def get_imgs_path(self):
-        return self.config['paths']['imgs'].get(str)
+        return self.config['paths']['imgs'].get()
 
     def get_save_path(self):
         return self.config['paths']['save'].get(str)

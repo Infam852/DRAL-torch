@@ -1,0 +1,24 @@
+sample_dataset:
+  dataset: Sample dateset
+
+  general:
+    image_size: 64
+    labels:
+      - a
+      - b
+
+  paths:
+    imgs:
+    save:
+
+  loader:
+    shuffle: True
+    label_format: one-hot
+
+  preprocessing:
+    grayscale: True
+    rescale_with_crop: True
+    normalization: True
+    centering: True
+    standarization: True
+    strict_balance: False

@@ -10,7 +10,19 @@ from dral.config.config_manager import ConfigManager
 from dral.utils import LOG
 
 
-def get_number_of_files(path, recursively=True):
+def get_number_of_files(path, recursively=True):  # !TODO optimize
+    """Count number of files in a specified directory. If recursively is
+    True then count also files in all of the subdirectories.
+    If path is not directory path then FiliNotFoundException is thrown.
+
+    Args:
+        path (str): path to directory
+        recursively (bool, optional): if True search recursively.
+        Defaults to True.
+
+    Returns:
+        int: number of files in the given directory
+    """
     n_files = 0
     for f in os.listdir(path):
         fpath = os.path.join(path, f)
@@ -43,9 +55,9 @@ class DataLoader:
 
     def _reset(self):
         self._x = np.zeros(
-            (self.MAX_IMGS*2, self.IMG_SIZE, self.IMG_SIZE), dtype=self.DTYPE)
+            (self.MAX_IMGS, self.IMG_SIZE, self.IMG_SIZE), dtype=self.DTYPE)
         self._y = np.zeros(
-            (self.MAX_IMGS*2, self.N_LABELS), dtype=self.DTYPE)
+            (self.MAX_IMGS, self.N_LABELS), dtype=self.DTYPE)
         self.balance_counter = {label: 0 for label in self.cm.get_labels()}
         self.n_exceptions_while_loading = 0
 
@@ -93,7 +105,7 @@ class DataLoader:
 
     def shuffle(self):
         """ Shuffle all of the loaded images. Does not check if
-        images was loaded.
+        images were loaded.
         """
         assert len(self._x) == len(self._y)
         p = np.random.permutation(len(self._x))
@@ -139,7 +151,7 @@ class DataLoader:
             raise Exception('Firstly you have to load data!')
 
     def _fail_if_path_is_not_dir(self, paths):
-        """ Raise exception if any of paths is not directory path
+        """ Raise exception if there is a non directory path
 
         Args:
             paths (list): list of paths
@@ -202,13 +214,11 @@ class DataLoader:
         self._x = self._x[:-self.n_exceptions_while_loading]
         self._y = self._y[:-self.n_exceptions_while_loading]
         LOG.info(f'Remove last {self.n_exceptions_while_loading} images')
-        print(self._x.shape)   
 
 
 if __name__ == '__main__':
-    cm = ConfigManager('cats_dogs_64')
+    cm = ConfigManager('cats_dogs_96')
     dl = DataLoader(cm)
     dl.load_raw()
-    # dl.shuffle()
     dl.print_balance_counter()
-    # dl.save(force=True)
+    dl.save(force=False)
