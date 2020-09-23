@@ -217,16 +217,8 @@ class DataLoader:
 
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     cm = ConfigManager('cats_dogs_96')
     dl = DataLoader(cm)
     dl.load_raw()
     dl.print_balance_counter()
     dl.save(force=False)
-=======
-    dl = DataLoader(CONFIG)
-    dl.load_training_data(enable_normalization=True)
-    dl.shuffle()
-    dl.print_balance_counter()
-    dl.save('data', 'cats_dogs_64_norm')
->>>>>>> ad4b236802fd6e6e9a886e813a5f826ca4bba4fc

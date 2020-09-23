@@ -34,7 +34,6 @@ def image_factory(**kwargs):
             max_ = kwargs.pop('max', 256)
             img = np.random.randint(min_, max_, size=dims, dtype=np.uint8)
         return img
-
     return _image
 
 
