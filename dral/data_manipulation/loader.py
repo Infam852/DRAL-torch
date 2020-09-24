@@ -10,6 +10,10 @@ from dral.config.config_manager import ConfigManager
 from dral.utils import LOG
 
 
+def one_hot_to_numeric(one_hot):
+    return np.argmax(one_hot, axis=0)
+
+
 def get_number_of_files(path, recursively=True):  # !TODO optimize
     """Count number of files in a specified directory. If recursively is
     True then count also files in all of the subdirectories.
@@ -54,10 +58,12 @@ class DataLoader:
         self._reset()
 
     def _reset(self):
+        color_channels = 1 if self.cm.do_grayscale() else 3
         self._x = np.zeros(
-            (self.MAX_IMGS, self.IMG_SIZE, self.IMG_SIZE), dtype=self.DTYPE)
+            (self.MAX_IMGS*2, self.IMG_SIZE, self.IMG_SIZE, color_channels),
+            dtype=self.DTYPE)
         self._y = np.zeros(
-            (self.MAX_IMGS, self.N_LABELS), dtype=self.DTYPE)
+            (self.MAX_IMGS*2, self.N_LABELS), dtype=self.DTYPE)
         self.balance_counter = {label: 0 for label in self.cm.get_labels()}
         self.n_exceptions_while_loading = 0
 
@@ -68,12 +74,12 @@ class DataLoader:
                  for label in self.cm.get_labels()]
         self._fail_if_path_is_not_dir(paths)
         self._reset()
-        for label, class_path in enumerate(paths):
+        for label_num, class_path in enumerate(paths):
             LOG.info(f'Start loading images from path: {class_path}')
             for k, f in tqdm(enumerate(os.listdir(class_path))):
                 if self.MAX_IMGS and k >= self.MAX_IMGS:
                     LOG.info(f'Maximum number of load attemps is reached '
-                             f'({k}) for class {self.cm.get_labels()[label]}')
+                             f'({k}) for class {self.cm.get_labels()[label_num]}')
                     break
                 try:
                     path = os.path.join(class_path, f)
@@ -93,10 +99,11 @@ class DataLoader:
                     if self.cm.do_standarization():
                         img /= img.std()
 
-                    self._x[k] = img
+                    self._x[label_num*self.MAX_IMGS + k] = img
                     # one-hot vector
-                    self._y[k] = np.eye(self.N_LABELS)[label]
-                    self.balance_counter[self.cm.get_labels()[label]] += 1
+                    self._y[label_num*self.MAX_IMGS + k] = \
+                        np.eye(self.N_LABELS)[label_num]
+                    self.balance_counter[self.cm.get_labels()[label_num]] += 1
 
                 except Exception as e:
                     LOG.warning(
@@ -113,14 +120,20 @@ class DataLoader:
         self._y = self._y[p]
         LOG.info('Data was shuffled')
 
-    def save(self, force=False):
+    def save(self, save_path=None, force=False, as_png=False):
         """Save loaded images to the specified in config path. If path does
         not exist and force is set to false then exception is raised. Otherwise
         create required directories and then save the data.
 
         Args:
+            save_path (str, optional): Path to save loaded data, if unspecified
+            then use path saved in config file
+
             force (bool, optional): If set then create required directories
             if they do not exis. Defaults to False.
+
+            as_png (bool, optional): If set to True then save images as png
+            instead of numpy array
 
         Raises:
             FileNotFoundError: If force is False and any of the directories
@@ -132,15 +145,23 @@ class DataLoader:
         self._clean()
 
         name = self.cm.get_config_name()
-        path = self.cm.get_save_path()
+        path = save_path if save_path is not None else self.cm.get_save_path()
+        path = os.path.join(path, name)
         if not force and not os.path.isdir(path):
             raise FileNotFoundError(
                 f'Path ({path}) was not found and force was set to False')
         # create directories if they do not exist
         Path(path).mkdir(parents=True, exist_ok=True)
 
-        np.save(f'{path}/x_{name}.npy', self._x)
-        np.save(f'{path}/y_{name}.npy', self._y)
+        if as_png:
+            for counter, (img, label) in enumerate(zip(self._x, self._y)):
+                filename = f'{counter}_{one_hot_to_numeric(label)}.png'
+                img_path = os.path.join(path, filename)
+                cv2.imwrite(img_path, img)
+                LOG.info(f'save image: {img_path}')
+        else:
+            np.save(f'{path}/x.npy', self._x)
+            np.save(f'{path}/y.npy', self._y)
         LOG.info(f'Data was saved in directory {path}')
 
     def print_balance_counter(self):
@@ -176,7 +197,8 @@ class DataLoader:
             array: array representation of rescaled image
         """
         if self.cm.do_rescale_with_crop():
-            (h, w) = img.shape
+            print(img.shape)
+            (h, w) = img.shape[:2]
             if h > w:
                 ratio = h / w
                 # dims: (w, h)
@@ -211,14 +233,16 @@ class DataLoader:
         occur if any image will not be loaded properly. Number of exceptions
         durning loading is tracking by n_exceptions_while_loading variable.
         """
+        LOG.info(f'Remove last {self.n_exceptions_while_loading} images...')
+        if not self.n_exceptions_while_loading:
+            return
         self._x = self._x[:-self.n_exceptions_while_loading]
         self._y = self._y[:-self.n_exceptions_while_loading]
-        LOG.info(f'Remove last {self.n_exceptions_while_loading} images')
 
 
 if __name__ == '__main__':
     cm = ConfigManager('cats_dogs_96')
-    dl = DataLoader(cm)
+    dl = DataLoader(cm, max_imgs=20)
     dl.load_raw()
     dl.print_balance_counter()
-    dl.save(force=False)
+    dl.save(save_path='server/static', force=True, as_png=True)

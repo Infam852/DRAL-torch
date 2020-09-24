@@ -34,17 +34,17 @@ cats_dogs_96:
       - Dog
 
   paths:
-    - imgs_dir: ./data/CatsDogs
-    - save: ./data/processed
+    imgs: ./data/CatsDogs
+    save: ./data/processed
 
   loader:
     shuffle: True
     label_format: one-hot
 
   preprocessing:
-    grayscale: True
+    grayscale: False
     rescale_with_crop: True
-    normalization: True
-    centering: True
-    standarization: True
+    normalization: False
+    centering: False
+    standarization: False
     strict_balance: False
