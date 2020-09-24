@@ -42,4 +42,4 @@ class TestDatasetManager:
 
         assert len(dm.unl) == n_samples - n_to_sample
         assert len(dm.train) == n_to_sample
-        assert np.all(dm.train.get_x() == unl_to_label)
+        assert np.all(dm.train.get_x().numpy() == unl_to_label)

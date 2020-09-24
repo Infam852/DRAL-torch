@@ -1,0 +1,57 @@
+openapi: 3.0.0
+info:
+  title: Sample API
+  description: API for simple HTTP server that visualize machine learning process
+  version: 0.0.1
+
+components:
+    schemas:
+      Config:
+        type: object
+        properties:
+            name:
+              type: string
+        additionalProperties: true
+        required:
+          - name
+
+paths:
+  /configs/:
+    get:
+      summary: Returns all possible configuration
+      responses: 
+        '200':
+          description: List of configurations
+          content:
+            application/json:
+              schema: 
+                type: array
+                items: 
+                  $ref: '#/components/schemas/Config'
+        '404':
+          description: Configuration not found
+
+  /configs/{name}:
+    get:
+      summary: Returns all possible configuration
+      parameters:
+          - in: path
+            name: name
+            description: Name of the configuration to be returned
+            schema:
+              type: string
+              example: cats_vs_dogs64
+            required: true
+
+      responses: 
+        '200':
+          description: Configuration
+          content:
+            application/json:
+              schema: 
+                type: object
+                items: 
+                  $ref: '#/components/schemas/Config'
+        '404':
+          description: Configuration with specified name not found
+

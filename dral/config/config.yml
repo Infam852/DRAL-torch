@@ -1,0 +1,50 @@
+cats_dogs_64:
+  dataset: Dogs vs Cats
+
+  general:
+    image_size: 64
+    labels:
+      - Cat
+      - Dog
+
+  paths:
+    imgs: ./data/PetImages
+    save: ./data/processed
+
+  loader:
+    shuffle: True
+    label_format: one-hot
+
+  preprocessing:
+    grayscale: True
+    rescale_with_crop: True
+    normalization: True
+    centering: True
+    standarization: True
+    strict_balance: False
+
+
+cats_dogs_96:
+  dataset: Dogs vs Cats
+
+  general:
+    image_size: 96
+    labels:
+      - Cat
+      - Dog
+
+  paths:
+    - imgs_dir: ./data/CatsDogs
+    - save: ./data/processed
+
+  loader:
+    shuffle: True
+    label_format: one-hot
+
+  preprocessing:
+    grayscale: True
+    rescale_with_crop: True
+    normalization: True
+    centering: True
+    standarization: True
+    strict_balance: False
