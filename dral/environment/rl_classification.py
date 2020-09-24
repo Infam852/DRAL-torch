@@ -144,7 +144,7 @@ if __name__ == '__main__':
     n_episodes = 5
     for k in range(n_episodes):
 
-        # label images and add them to train storage
+        # label images
         y_oracle = label_samples(dm, y_oracle, n=100, random=True)
         dm.train.shuffle()
         print(dm)
