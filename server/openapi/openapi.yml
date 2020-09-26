@@ -86,7 +86,7 @@ paths:
         '404':
           description: Configuration with specified name not found
 
-  /images/train:
+  /images:
     post:
       summary: Post labels annoted by the user.
       tags:
@@ -94,6 +94,7 @@ paths:
       requestBody:
         description: Two lists, first of them contains indicies of train images
           and the second one contains corresponding labels.
+        required: true
         content:
           application/json:
             schema:
@@ -122,29 +123,27 @@ paths:
             description: Number of images to show
             schema:
               type: integer
-            required: True
-      requestBody:
-        description: Indicies of images to show, if it is specified then 
-          random parameter should be set to False.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                indicies:
-                  type: array
-                  items:
-                    type: integer
+            # required: True
+      # requestBody:
+      #   description: Indicies of images to show, if it is specified then 
+      #     random parameter should be set to False.
+      #   content:
+      #     application/json:
+      #       schema:
+      #         type: object
+      #         properties:
+      #           indicies:
+      #             type: array
+      #             items:
+      #               type: integer
 
       responses:
           '200':
             description: Return desired number of indicies
             content:
-              application/json:
+              text/html:
                 schema:
-                  oneOf:
-                    - $ref: '#/components/schemas/LabelledImages'
-                    - $ref: '#/components/schemas/Images'
+                  type: string
 
         
 

@@ -23,8 +23,8 @@ IMG_SIZE = CONFIG['img_size']
 
 # x_train = DataLoader.load(os.path.join(DATASETS_DICT, 'x_rps_skimage.npy'))
 # y_train = DataLoader.load(os.path.join(DATASETS_DICT, 'y_rps_skimage.npy'))
-x_train = DataLoader.load(CONFIG['data']['x_path'])
-y_train = DataLoader.load(CONFIG['data']['y_path'])
+x_train = DataLoader.load_npy(CONFIG['data']['x_path'])
+y_train = DataLoader.load_npy(CONFIG['data']['y_path'])
 
 x_train = torch.Tensor(x_train).view(-1, IMG_SIZE, IMG_SIZE)
 y_train = torch.Tensor(y_train)

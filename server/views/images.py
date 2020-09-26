@@ -1,8 +1,18 @@
 from flask.views import MethodView
-from flask import render_template
+from flask import render_template, send_file, url_for
+from server import app
+import os
+
+IMG_FOLDER = os.path.join('static', 'cats_dogs_96')
 
 
-class TrainImagesView(MethodView):
+class ImagesView(MethodView):
 
-    def get(self):
-        return render_template('images.html', imgpath='server/static/cats_dogs/0_0.png')
+    def search(self):
+        PEOPLE_FOLDER = os.path.join('static', 'imgs')
+        full_filename = os.path.join(PEOPLE_FOLDER, '1_0.png')
+
+        return render_template("images.html", user_image=full_filename)
+
+    def post(self):
+        pass

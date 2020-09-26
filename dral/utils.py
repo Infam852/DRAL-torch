@@ -17,9 +17,9 @@ def tensor_to_numpy_1d(tensor):
     return tensor.flatten().detach().numpy().astype(np.float32)
 
 
-def show_img(img, label=None, figsize=(4, 4)):
+def show_img(img, label=None, figsize=(4, 4), cmap='gray'):
     plt.figure(figsize=figsize)
-    plt.imshow(img, cmap='gray')
+    plt.imshow(img, cmap=cmap)
     plt.title(f"label: {label}" if label is not None else "")
     plt.axis("off")
     plt.show()

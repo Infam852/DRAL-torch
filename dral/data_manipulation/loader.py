@@ -2,12 +2,11 @@ import os
 from pathlib import Path
 import numpy as np
 
-import matplotlib.pyplot as plt
 import cv2
 from tqdm import tqdm
 
 from dral.config.config_manager import ConfigManager
-from dral.utils import LOG
+from dral.utils import LOG, check_dtype
 
 
 def one_hot_to_numeric(one_hot):
@@ -37,6 +36,28 @@ def get_number_of_files(path, recursively=True):  # !TODO optimize
     return n_files
 
 
+class Image:
+    IMG_PATTERN = '{name}_{label}.{ext}'
+
+    def __init__(self, x, y, path, convert_to_numpy=False):
+        if convert_to_numpy:
+            x = np.array(x)
+            y = np.array(y)
+
+        check_dtype(x, np.ndarray)
+        check_dtype(y, np.uint8)
+
+        self.x = x
+        self.y = y
+        self.path = path
+
+    def __repr__(self):
+        return f'({self.x.shape}) ({self.y}) ({self.path})'
+
+    def set_label(self, label):
+        self.y = label
+
+
 class DataLoader:
     def __init__(self, cm, max_imgs=None):
         """Initialize data loader with specification saved in CONFIG dictionary
@@ -50,36 +71,40 @@ class DataLoader:
         # !TODO label_format
         self.cm = cm
         self.IMG_SIZE = cm.get_img_size()
+        self.N_LABELS = len(cm.get_label_names())
         self.MAX_IMGS = max_imgs if max_imgs \
             else get_number_of_files(cm.get_imgs_path())
-        self.N_LABELS = len(cm.get_labels())
-        self.DTYPE = np.float32 if cm.do_normalization() else np.uint8
-
+        self.MAX_IMGS_PER_CLASS = self.MAX_IMGS // self.N_LABELS
         self._reset()
 
     def _reset(self):
         color_channels = 1 if self.cm.do_grayscale() else 3
+        dtype = np.float32 if cm.do_normalization() else np.uint8
+
         self._x = np.zeros(
-            (self.MAX_IMGS*2, self.IMG_SIZE, self.IMG_SIZE, color_channels),
-            dtype=self.DTYPE)
-        self._y = np.zeros(
-            (self.MAX_IMGS*2, self.N_LABELS), dtype=self.DTYPE)
-        self.balance_counter = {label: 0 for label in self.cm.get_labels()}
+            (self.MAX_IMGS, self.IMG_SIZE, self.IMG_SIZE, color_channels),
+            dtype=dtype)
+        self._y = np.zeros(self.MAX_IMGS, dtype=np.uint8)
+
+        self.balance_counter = \
+            {label: 0 for label in self.cm.get_label_names()}
         self.n_exceptions_while_loading = 0
 
     def load_raw(self):
         """ Load images and apply preprocessing on them based on config file
         """
-        paths = [os.path.join(self.cm.get_imgs_path(), label)
-                 for label in self.cm.get_labels()]
+        paths = self.cm.get_class_paths()
+        labels = self.cm.get_numeric_labels()
+        print(labels)
         self._fail_if_path_is_not_dir(paths)
         self._reset()
-        for label_num, class_path in enumerate(paths):
-            LOG.info(f'Start loading images from path: {class_path}')
+        for ctr, (label, class_path) in enumerate(zip(labels, paths)):
+            LOG.info(f'Start loading images from path: {class_path}...')
             for k, f in tqdm(enumerate(os.listdir(class_path))):
-                if self.MAX_IMGS and k >= self.MAX_IMGS:
-                    LOG.info(f'Maximum number of load attemps is reached '
-                             f'({k}) for class {self.cm.get_labels()[label_num]}')
+                if self.MAX_IMGS_PER_CLASS and k >= self.MAX_IMGS_PER_CLASS:
+                    LOG.info(
+                        f'Maximum number of load attemps is reached ({k})'
+                        f' for class {label}')
                     break
                 try:
                     path = os.path.join(class_path, f)
@@ -99,13 +124,12 @@ class DataLoader:
                     if self.cm.do_standarization():
                         img /= img.std()
 
-                    self._x[label_num*self.MAX_IMGS + k] = img
-                    # one-hot vector
-                    self._y[label_num*self.MAX_IMGS + k] = \
-                        np.eye(self.N_LABELS)[label_num]
-                    self.balance_counter[self.cm.get_labels()[label_num]] += 1
+                    self._x[ctr*self.MAX_IMGS + k] = img
+                    self._y[ctr*self.MAX_IMGS + k] = label
 
-                except Exception as e:
+                    self.balance_counter[self.cm.get_label_name(ctr)] += 1
+
+                except OSError as e:
                     LOG.warning(
                         f'Error while loading image from path {path}: {e}')
                     self.n_exceptions_while_loading += 1
@@ -120,10 +144,12 @@ class DataLoader:
         self._y = self._y[p]
         LOG.info('Data was shuffled')
 
-    def save(self, save_path=None, force=False, as_png=False):
-        """Save loaded images to the specified in config path. If path does
-        not exist and force is set to false then exception is raised. Otherwise
-        create required directories and then save the data.
+    def save(self, save_path=None, force=False,
+             as_png=False, png_and_npy=False):
+        """Save loaded images to the specified in config path (by default as
+        numpy array). If path does not exist and force is set to false then
+        exception is raised. Otherwise create required directories and then
+        save the data.
 
         Args:
             save_path (str, optional): Path to save loaded data, if unspecified
@@ -155,10 +181,10 @@ class DataLoader:
 
         if as_png:
             for counter, (img, label) in enumerate(zip(self._x, self._y)):
-                filename = f'{counter}_{one_hot_to_numeric(label)}.png'
+                filename = f'{counter}_{label}.png'
                 img_path = os.path.join(path, filename)
                 cv2.imwrite(img_path, img)
-                LOG.info(f'save image: {img_path}')
+                LOG.debug(f'save image: {img_path}')
         else:
             np.save(f'{path}/x.npy', self._x)
             np.save(f'{path}/y.npy', self._y)
@@ -166,7 +192,7 @@ class DataLoader:
 
     def print_balance_counter(self):
         if sum(self.balance_counter.values()):
-            for label in self.cm.get_labels():
+            for label in self.cm.get_label_names():
                 print(f'Number of {label} imgs: {self.balance_counter[label]}')
         else:
             raise Exception('Firstly you have to load data!')
@@ -197,7 +223,6 @@ class DataLoader:
             array: array representation of rescaled image
         """
         if self.cm.do_rescale_with_crop():
-            print(img.shape)
             (h, w) = img.shape[:2]
             if h > w:
                 ratio = h / w
@@ -217,16 +242,52 @@ class DataLoader:
         return img
 
     @staticmethod
-    def load(path):
+    def load_npy(prefix, sufix):
         """Load pickled numpy array from specified path
 
         Args:
-            path (file-like obj): the file to read from
+            prefix (file-like obj): prefix of the filepath
+
+            sufix (file-like obj): filename
 
         Returns:
             array: loaded numpy array
         """
+        path = os.path.join(prefix, sufix)
         return np.load(path, allow_pickle=True)
+
+    @staticmethod
+    def load_images(path, ext='png'):
+        x = DataLoader.load_npy(path, 'x.npy')
+        y = DataLoader.load_npy(path, 'y.npy')
+        images = []
+        for k in range(len(x)):
+            img_path = os.path.join(
+                path, Image.IMG_PATTERN.format(name=k, label=y[k], ext=ext))
+            if not os.path.isfile(img_path):
+                raise Exception(f'Path {img_path} does not exist')
+            images.append(Image(x[k], y[k], img_path))
+        LOG.info(f'{len(images)} images have been loaded')
+        return images
+
+    @staticmethod
+    def load_image(path, color_mode=cv2.IMREAD_COLOR, convert_to_rgb=True):
+        """Load image from specified path and converrt it to rgb if necessary
+
+        Args:
+            path (file-like obj): path from where image will be loaded
+
+            color_mode (cv2 color_mode, optional): color mode.
+            Defaults to cv2.IMREAD_COLOR.
+
+            convert_to_rgb (bool, optional): if set to Treu then convert image
+            to rgb, cv2 uses bgr by default. Defaults to True.
+
+        Returns:
+            np.ndarray: numpy representation of an image
+        """
+        img = cv2.imread(path, flags=color_mode)
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if convert_to_rgb else img
 
     def _clean(self):
         """Remove trailing empty elements in _x and _y arrays. They will
@@ -239,10 +300,22 @@ class DataLoader:
         self._x = self._x[:-self.n_exceptions_while_loading]
         self._y = self._y[:-self.n_exceptions_while_loading]
 
+    def get_x(self):
+        return self._x
+
+    def get_y(self):
+        return self._y
+
 
 if __name__ == '__main__':
-    cm = ConfigManager('cats_dogs_96')
-    dl = DataLoader(cm, max_imgs=20)
+    cm = ConfigManager('testset')
+    dl = DataLoader(cm)
     dl.load_raw()
     dl.print_balance_counter()
-    dl.save(save_path='server/static', force=True, as_png=True)
+    dl.save(force=True, as_png=True)
+
+    cm.enable_npy_preprocessing(True)
+
+    dl.load_raw()
+    dl.print_balance_counter()
+    dl.save(force=True)

@@ -1,105 +1,69 @@
 import numpy as np
+import os
 
+import cv2
 import torch
 
-from dral.data_manipulation.loader import DataLoader
+from dral.data_manipulation.loader import DataLoader, Image
+from dral.config.config_manager import ConfigManager
 from dral.utils import check_dtype
 from dral.logger import Logger
+from dral.errors import fail_if_len_mismatch
+from dral.utils import show_img, show_grid_imgs
 
 LOG = Logger.get_logger()
 
 
-def init_dm(CONF):
-    x_path = CONF['data']['x_path']
-    y_path = CONF['data']['y_path']
-    img_size = CONF['img_size']
-    n_train = CONF['n_train']
-    n_eval = CONF['n_eval']
-    n_test = CONF['n_test']
-
-    x = DataLoader.load(x_path)
-    y = DataLoader.load(y_path)
-
-    x = torch.Tensor(x).view(-1, img_size, img_size)
-    y = torch.Tensor(y)
-
-    if n_train + n_eval + n_test > len(x):
-        raise Exception('Not enough data!')
-
-    x_eval = x[:n_eval]
-    y_eval = y[:n_eval]
-
-    x_test = x[n_eval:n_eval+n_test]
-    y_test = y[n_eval:n_eval+n_test]
-
-    x_train = x[n_eval+n_test:n_eval+n_test+n_train]
-    y_oracle = y[n_eval+n_test:n_eval+n_test+n_train]
-
-    dm = DatasetsManager(x_train, x_eval, y_eval, x_test, y_test)
-    LOG.info(f'DatasetManager has been initialized with {repr(dm)}')
-    return dm, y_oracle
-
-
 class DatasetsManager:
-    def __init__(self, x_unlabelled, x_eval, y_eval, x_test, y_test):
+    def __init__(self, cm, imgs):
         """
         Samples passed should be preprocessed, especially their
         dimension should be expanded
         """
-        self._validate(x_unlabelled, x_eval, y_eval, x_test, y_test)
+        self.cm = cm
+        self.BASEPATH = self.cm.get_dataset_path()
+        self.DELIMITER = self.cm.get_name_class_delimiter()
+        self.unl, self.labelled = self.split_images(imgs)
+        self.train = ImagesStorage([])
+        self.eval = ImagesStorage([])
+        self.test = ImagesStorage([])
 
-        self.add_basic_storage('unl', x_unlabelled)
-        self.add_storage('eval', x_eval, y_eval)
-        self.add_storage('test', x_test, y_test)
-        self.add_storage(
-            'train', np.empty((0,) + self.test.get_feature_shape()),
-            np.empty((0,) + self.test.get_label_shape())
-        )
+    def _get_imgs_with_labels(self):
+        """Iterate over all files in the BASEPATH and get all paths
+        of png or jpg files.
 
-    def add_storage(self, name, x, y):
-        setattr(self, name, Storage(x, y, name))
+        Returns:
+            list: List of images paths
+        """
+        all_images = []
+        for filename in os.listdir(self.BASEPATH):
+            name, sufix = filename.rsplit('.')
+            if sufix not in ['jpg', 'png']:
+                continue
 
-    def add_basic_storage(self, name, x):
-        setattr(self, name, BasicStorage(x, name))
+            if filename.count(self.DELIMITER) != 1:
+                LOG.error(f'Wrong filename ({filename}), there must'
+                          f'be exactly one ({self.DELIMITER}) character')
+                raise Exception('Filename must contain exactly one delimiter')
+            all_images.append(filename)
+        return all_images
 
-    def _validate(self, x_unlabelled, x_eval, y_eval, x_test, y_test):
-        self._fail_if_len_mismatch(x_eval, y_eval, 'eval')
-        self._fail_if_len_mismatch(x_test, y_test, 'test')
-        self._fail_if_shape_mismatch(x_unlabelled, x_eval, x_test)
-
-    def _fail_if_len_mismatch(self, x, y, name):
-        if len(x) != len(y):
-            raise ValueError(f"Number of {name} features must equal \
-                              number of {name} labels")
-
-    def _fail_if_shape_mismatch(self, *args):
-        it = iter(args)
-        shape = next(it).shape[1:]
-        if not all(arg.shape[1:] == shape for arg in args):
-            raise ValueError(f"Not all args have shape: {shape}")
+    def split_images(self, imgs):
+        unl = []
+        labelled = []
+        for img in imgs:
+            if img.y == self.cm.get_unknown_label():
+                unl.append(img)
+            else:
+                labelled.append(img)
+        return ImagesStorage(unl), ImagesStorage(labelled)
 
     def label_samples(self, idxs, labels):
-        if len(idxs) != len(labels):
-            raise ValueError(
-                f"""Length of indicies ({len(idxs)}) must be equal to the length of
-                labels ({len(labels)})""")
+        fail_if_len_mismatch(idxs, labels)
 
-        # !TODO maybe transaction method (from, to, idxs, **kwargs)?
-        self.train.add(self.unl.get_x(idxs), labels)
-        self.unl.remove(idxs)
-
-    def get_x_shape(self):
-        return self.x_shape
-
-    def get_y_shape(self):
-        return self.y_shape
-
-    def shuffle(self):
-        pass
-
-    def reset(self):
-        # remove all labels
-        pass
+        imgs = self.unl.pop(idxs)
+        ImagesStorage.set_labels(imgs, labels)
+        self.train.append(imgs)
 
     def __str__(self):
         msg = """
@@ -116,108 +80,93 @@ class DatasetsManager:
             len(self.unl), len(self.train), len(self.eval), len(self.test))
 
 
-class Storage:
-    def __init__(self, x, y, name):
-        """ x, y should be numpy arrays """
-        if len(x) != len(y):
-            raise ValueError(f'Number of x samples({len(x)}) does not match \
-                            number of y samples({len(y)})')
-        self._x = x
-        self._y = y
-        self.name = name
+class ImagesStorage:
+    def __init__(self, imgs):
+        if not all(isinstance(img, Image) for img in imgs):
+            raise ValueError('All elements in imgs list have to be'
+                             'an instance of Image class')
+        self.imgs = imgs
 
-    def add(self, x_new, y_new):
-        self._x = torch.from_numpy(np.append(self._x, x_new, axis=0))
-        self._y = torch.from_numpy(np.append(self._y, y_new, axis=0))
+    def __getitem__(self, idx):
+        return self.imgs[idx]
 
-    def remove(self, idxs):
-        self._x = np.delete(self._x, idxs, axis=0)
-        self._y = np.delete(self._y, idxs, axis=0)
-
-    def get_x(self, idx=-1):
-        check_dtype(idx, int, list, np.ndarray)
-
-        if isinstance(idx, int) and idx < 0:
-            return self._x
-        return self._x[idx]
-
-    def get_y(self, idx=-1):
-        check_dtype(idx, int, list, np.ndarray)
-
-        if isinstance(idx, int) and idx < 0:
-            return self._y
-        return self._y[idx]
-
-    def get_xy(self, idx=-1):
-        check_dtype(idx, int, list, np.ndarray)
-
-        if isinstance(idx, int) and idx < 0:
-            return (self._x, self._y)
-        return (self._x[idx], self._y[idx])
-
-    def shuffle(self):
-        p = np.random.permutation(len(self._x))
-        self._x = self._x[p]
-        self._y = self._y[p]
-
-    def sample_xy(self, n):
-        p = np.random.permutation(n)
-        return self._x[p], self._y[p]
-
-    def get_x_shape(self):
-        return self._x.shape
-
-    def get_y_shape(self):
-        return self._y.shape
-
-    def get_feature_shape(self):
-        return self._x.shape[1:]
-
-    def get_label_shape(self):
-        return self._y.shape[1:]
-
-    def __len__(self):
-        return len(self._x)
-
-    def __str__(self):
-        return f"Number of {self.name} samples in storage: {len(self)}"
-
-
-class BasicStorage:
-    """ Storage for one variable """
-
-    def __init__(self, x, name):
-        self._x = x
-        self.name = name
-        self._counter = 0
-
-    def get_x(self, idx=-1):
-        check_dtype(idx, int, list, np.ndarray)
-
-        if isinstance(idx, int) and idx < 0:
-            return self._x
-        return self._x[idx]
-
-    def __next__(self):
-        if self._counter < len(self._x):
-            idx = self._counter
-            self._counter += 1
-            return idx
-        else:
-            raise StopIteration()
-
-    def __iter__(self):
-        self._counter = 0
-        return self
+    def append(self, imgs):
+        self.imgs.extend(imgs)
 
     def remove(self, idxs):
-        self._x = np.delete(self._x, idxs, axis=0)
+        for idx in sorted(idxs, reverse=True):
+            del self.imgs[idx]
 
-    def get_x_shape(self):
-        return self._x.shape
+    def pop(self, idxs):
+        imgs = []
+        for idx in sorted(idxs, reverse=True):
+            imgs.append(self.imgs.pop(idx))
+        return imgs
 
-    def get_feature_shape(self):
-        return self._x.shape[1:]
+    @staticmethod
+    def set_labels(imgs, labels):
+        fail_if_len_mismatch(imgs, labels)
+        for imgs, label in zip(imgs, labels):
+            imgs.y = labels
+
+    def sample(self, n):
+        pass
+
+    def get(self, idxs=-1):
+        check_dtype(idxs, int, list, np.ndarray)
+
+        if isinstance(idxs, int) and idxs < 0:
+            return self.imgs
+
+        if isinstance(idxs, int):
+            return self.imgs[idxs]
+
+        return [self.imgs[idx] for idx in idxs]
+
+    def get_x(self, idxs=-1):
+        check_dtype(idxs, int, list, np.ndarray)
+
+        if isinstance(idxs, int) and idxs < 0:
+            return self.imgs
+
+        if isinstance(idxs, int):
+            return self.imgs[idxs].x
+
+        return [self.imgs[idx].x for idx in idxs]
+
+    def get_y(self, idxs=-1):
+        check_dtype(idxs, int, list, np.ndarray)
+
+        if isinstance(idxs, int) and idxs < 0:
+            return self.imgs
+
+        if isinstance(idxs, int):
+            return self.imgs[idxs].y
+
+        return [self.imgs[idx].y for idx in idxs]
+
+    def get_path(self, idxs=-1):
+        check_dtype(idxs, int, list, np.ndarray)
+
+        if isinstance(idxs, int) and idxs < 0:
+            return self.imgs
+
+        if isinstance(idxs, int):
+            return self.imgs[idxs].path
+
+        return [self.imgs[idx].path for idx in idxs]
 
     def __len__(self):
-        return len(self._x)
+        return len(self.imgs)
+
+
+if __name__ == "__main__":
+    cm = ConfigManager('testset')
+    imgs = DataLoader.load_images(cm.get_dataset_path())
+
+    dm = DatasetsManager(cm, imgs)
+    labels = [0, 1, 1, 0]
+    dm.label_samples([0, 1, 2, 3], labels)
+    img = DataLoader.load_image(dm.unl.get_path(110))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)   # cv2 uses BGR format
+    show_img(img)
