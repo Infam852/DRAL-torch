@@ -39,10 +39,33 @@ def get_number_of_files(path, recursively=True):  # !TODO optimize
 class Image:
     IMG_PATTERN = '{name}_{label}.{ext}'
 
-    def __init__(self, x, y, path, convert_to_numpy=False):
+    def __init__(self, x, y, path, convert_to_numpy=False, relative=True):
+        """Image representation
+
+        Args:
+            x (np.ndarray): representation of an image as 3d array, where third
+            dimension refers to color channels
+
+            y (np.uint8): numeric label
+
+            path (str): path where png or jpg representation of an image is
+            stored 
+
+            convert_to_numpy (bool, optional): if set to True then it
+            is possible to pass array like object and it will be converted to
+            numpy. Defaults to False.
+
+            relative (bool, optional): if set to True then path will be cut so
+            that it starts with static. This operation is necessary for proper
+            loading image in flask. E.g. ./ Defaults to True.
+        """
         if convert_to_numpy:
-            x = np.array(x)
-            y = np.array(y)
+            x = np.array(x, dtype=np.float32)
+            y = np.array(y, dtype=np.uint8)
+
+        if relative:
+            idx = path.index('static')
+            path = path[idx:]
 
         check_dtype(x, np.ndarray)
         check_dtype(y, np.uint8)

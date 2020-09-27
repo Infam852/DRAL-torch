@@ -145,3 +145,7 @@ logs/
 
 # data should be downloaded
 data/
+
+*.png
+*.jpg
+*.npy

@@ -2,7 +2,6 @@ matplotlib==3.3.1
 tqdm==4.48.2  # probably to remove
 scikit-image==0.17.2
 gym==0.17.2
-tensorflow==1.15.0
 confuse
 # stable-baselines==2.10.1
 stable-baselines3==0.8.0

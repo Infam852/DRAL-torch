@@ -64,6 +64,7 @@ class DatasetsManager:
         imgs = self.unl.pop(idxs)
         ImagesStorage.set_labels(imgs, labels)
         self.train.append(imgs)
+        self.labelled.append(imgs)
 
     def __str__(self):
         msg = """
@@ -80,7 +81,7 @@ class DatasetsManager:
             len(self.unl), len(self.train), len(self.eval), len(self.test))
 
 
-class ImagesStorage:
+class ImagesStorage:  # !TODO check dimension when add new samples
     def __init__(self, imgs):
         if not all(isinstance(img, Image) for img in imgs):
             raise ValueError('All elements in imgs list have to be'
@@ -101,13 +102,13 @@ class ImagesStorage:
         imgs = []
         for idx in sorted(idxs, reverse=True):
             imgs.append(self.imgs.pop(idx))
-        return imgs
+        return imgs[::-1]  # to preserve the order
 
     @staticmethod
     def set_labels(imgs, labels):
         fail_if_len_mismatch(imgs, labels)
         for imgs, label in zip(imgs, labels):
-            imgs.y = labels
+            imgs.y = label
 
     def sample(self, n):
         pass
@@ -127,7 +128,7 @@ class ImagesStorage:
         check_dtype(idxs, int, list, np.ndarray)
 
         if isinstance(idxs, int) and idxs < 0:
-            return self.imgs
+            return [img.x for img in self.imgs]
 
         if isinstance(idxs, int):
             return self.imgs[idxs].x
@@ -138,7 +139,7 @@ class ImagesStorage:
         check_dtype(idxs, int, list, np.ndarray)
 
         if isinstance(idxs, int) and idxs < 0:
-            return self.imgs
+            return [img.y for img in self.imgs]
 
         if isinstance(idxs, int):
             return self.imgs[idxs].y
@@ -149,7 +150,7 @@ class ImagesStorage:
         check_dtype(idxs, int, list, np.ndarray)
 
         if isinstance(idxs, int) and idxs < 0:
-            return self.imgs
+            return [img.path for img in self.imgs]
 
         if isinstance(idxs, int):
             return self.imgs[idxs].path
@@ -162,7 +163,7 @@ class ImagesStorage:
 
 if __name__ == "__main__":
     cm = ConfigManager('testset')
-    imgs = DataLoader.load_images(cm.get_dataset_path())
+    imgs = DataLoader.load_images(cm.get_relative_dataset_path())
 
     dm = DatasetsManager(cm, imgs)
     labels = [0, 1, 1, 0]

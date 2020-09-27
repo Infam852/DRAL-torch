@@ -1,45 +1,49 @@
 import numpy as np
 import pytest
+from unittest.mock import MagicMock
 
 from dral.data_manipulation.dataset_manager import DatasetsManager
+from dral.data_manipulation.loader import Image
 
 
-n_samples = 10
-x_samples_dim = 5
-y_range = 5
+N_SAMPLES = 6
+UNLABELLED = 255
+LABELS = [UNLABELLED]*N_SAMPLES
+X_DIM = (2, 2)
+N_LABELS = 2
+PATH = 'placeholder'
+SEED = 1
 
 
 @pytest.fixture
 def dm():
-    np.random.seed(1)
-    unl = np.random.rand(n_samples, x_samples_dim)
-    x_eval = np.random.rand(n_samples, x_samples_dim)
-    y_eval = np.random.randint(y_range, size=n_samples)
-    x_test = np.random.rand(n_samples, x_samples_dim)
-    y_test = np.random.randint(y_range, size=n_samples)
-    dm = DatasetsManager(unl, x_eval, y_eval, x_test, y_test)
+    np.random.seed(SEED)
+    xs = np.random.rand(N_SAMPLES, *X_DIM)
+    ys = np.array(LABELS, dtype=np.uint8)
+    imgs = [Image(x, y, PATH) for x, y in zip(xs, ys)]
+
+    cm = MagicMock()
+    cm.get_dataset_path.return_value = 'undefined'
+    cm.get_unknown_label.return_value = UNLABELLED
+
+    dm = DatasetsManager(cm, imgs)
     return dm
 
 
 class TestDatasetManager:
     def test_initialization(self, dm):
-        assert hasattr(dm, 'unl')
-        assert hasattr(dm, 'eval')
-        assert hasattr(dm, 'test')
-        assert hasattr(dm, 'train')
-        assert len(dm.unl) == n_samples
-        assert len(dm.eval) == n_samples
-        assert len(dm.test) == n_samples
-        assert len(dm.train) == 0
+        assert len(dm.unl) == 6
+        assert len(dm.labelled) == 0
 
     def test_label_samples(self, dm):
-        n_to_sample = 5
-        labels = np.random.randint(y_range, size=n_to_sample)
-        idxs = np.arange(n_to_sample)
-        unl_to_label = dm.unl.get_x(idxs)
+        idxs = [0, 2, 3]
+        labels = [0, 1, 0]
+        imgs_to_sample = dm.unl.get(idxs)
 
         dm.label_samples(idxs, labels)
+        sampled_imgs = dm.train.get()
 
-        assert len(dm.unl) == n_samples - n_to_sample
-        assert len(dm.train) == n_to_sample
-        assert np.all(dm.train.get_x().numpy() == unl_to_label)
+        assert len(dm.unl) == 3
+        assert len(dm.train) == 3
+        assert len(dm.labelled) == 3
+        assert imgs_to_sample == sampled_imgs

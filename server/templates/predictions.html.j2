@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block header %}
+  <h1>{% block title %}Predictions{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<div class="container col-sm-10">
+    <div class="row" id="images">
+    <div class="col-sm-6 pr-5">
+        <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 1</h1>
+        <hr class="mt-2 mb-5">
+        <div class="row text-center text-lg-left">
+            {% for image_name in image_names %}
+            <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
+                <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+            </div>
+            
+            {% endfor %}
+        </div>
+    </div>
+     <div class="col-sm-6 pl-5">
+        <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 2</h1>
+        <hr class="mt-2 mb-5">
+        <div class="row text-center text-lg-left">
+            {% for image_name in image_names %}
+            <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
+                <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    </div>
+    <script>
+        window.addEventListener("click", function(event) {
+            if (event.target.tagName == "IMG") {
+                event.target.style.opacity = 0.6;
+            }
+            console.log(event.target);  // to get the element
+            console.log(event.target.tagName);  // to get the element tag name alone
+        });
+    </script>
+</div>
+ 
+{% endblock %}

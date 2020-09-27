@@ -1,18 +1,20 @@
+import os
+
 from flask.views import MethodView
 from flask import render_template, send_file, url_for
 from server import app
-import os
 
-IMG_FOLDER = os.path.join('static', 'cats_dogs_96')
+from dral.data_manipulation.dataset_manager import DatasetsManager
+from dral.data_manipulation.loader import DataLoader
 
 
 class ImagesView(MethodView):
 
     def search(self):
-        PEOPLE_FOLDER = os.path.join('static', 'imgs')
-        full_filename = os.path.join(PEOPLE_FOLDER, '1_0.png')
-
-        return render_template("images.html", user_image=full_filename)
+        imgs = DataLoader.load_images(app.app.config['cm'].get_dataset_path())
+        dm = DatasetsManager(app.app.config['cm'], imgs)
+        paths = dm.unl.get_path()
+        return render_template("predictions.html.j2", image_names=paths), 200
 
     def post(self):
         pass
