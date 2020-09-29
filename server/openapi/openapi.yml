@@ -43,6 +43,37 @@ components:
             - labels
 
 paths:
+  /home:
+    get:
+      summary: Home page
+      tags:
+        - main
+      responses:
+        200:
+          description: OK
+          content:
+              text/html:
+                schema:
+                  type: string
+
+    post:
+      summary: Test endpoint
+      tags:
+        - main
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+
+      responses:
+        200:
+          description: OK
+          content:
+              text/html:
+                schema:
+                  type: string
+
   /configs/:
     get:
       summary: Returns all possible configuration
@@ -144,6 +175,7 @@ paths:
               text/html:
                 schema:
                   type: string
+
 
         
 

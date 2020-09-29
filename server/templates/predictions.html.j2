@@ -7,38 +7,74 @@
 {% block content %}
 <div class="container col-sm-10">
     <div class="row" id="images">
-    <div class="col-sm-6 pr-5">
-        <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 1</h1>
-        <hr class="mt-2 mb-5">
-        <div class="row text-center text-lg-left">
-            {% for image_name in image_names %}
-            <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
-                <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+        <div class="col-sm-6 pr-5">
+            <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 1</h1>
+            <hr class="mt-2 mb-5">
+            <div class="row text-center text-lg-left">
+                {% for image_name in image_names %}
+                <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
+                    <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+                </div>
+                
+                {% endfor %}
             </div>
-            
-            {% endfor %}
+        </div>
+        <div class="col-sm-6 pl-5">
+            <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 2</h1>
+            <hr class="mt-2 mb-5">
+            <div class="row text-center text-lg-left">
+                {% for image_name in image_names %}
+                <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
+                    <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
-     <div class="col-sm-6 pl-5">
-        <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 2</h1>
-        <hr class="mt-2 mb-5">
-        <div class="row text-center text-lg-left">
-            {% for image_name in image_names %}
-            <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
-                <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
-            </div>
-            {% endfor %}
-        </div>
+    <div>
+        <button class="btn" type="button" onclick="sendPredictions()">Click</button>
     </div>
-    </div>
+
     <script>
+        function removeA(arr) {
+            var what, a = arguments, L = a.length, ax;
+            while (L > 1 && arr.length) {
+                what = a[--L];
+                while ((ax= arr.indexOf(what)) !== -1) {
+                    arr.splice(ax, 1);
+                }
+            }
+            return arr;
+        }
+
+        var wrong_predictions = []
         window.addEventListener("click", function(event) {
             if (event.target.tagName == "IMG") {
-                event.target.style.opacity = 0.6;
+                if (event.target.hasAttribute('selected')) {
+                    event.target.removeAttribute('selected')
+                    event.target.style.opacity = 1;
+                    removeA(wrong_predictions, event.target.src)
+                }
+                else {
+                    event.target.setAttribute('selected', true)
+                    event.target.style.opacity = 0.6;
+                    wrong_predictions.push(event.target.src)
+                }
             }
-            console.log(event.target);  // to get the element
-            console.log(event.target.tagName);  // to get the element tag name alone
         });
+
+        function sendPredictions(){
+            $.ajax({
+                url: '/home',
+                type: "POST",
+                data: JSON.stringify({x: wrong_predictions}),
+                contentType: "application/json; charset=utf-8",
+                success: function(){
+                    window.location.href = "/home";
+                }
+            });
+        }
+        
     </script>
 </div>
  
