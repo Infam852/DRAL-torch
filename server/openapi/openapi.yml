@@ -117,7 +117,7 @@ paths:
         '404':
           description: Configuration with specified name not found
 
-  /images:
+  /predictions:
     post:
       summary: Post labels annoted by the user.
       tags:
@@ -175,14 +175,3 @@ paths:
               text/html:
                 schema:
                   type: string
-
-
-        
-
-
-
-  
-        
-
-
-      

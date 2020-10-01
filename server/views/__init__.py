@@ -1,3 +1,3 @@
 from .config import ConfigsView
-from .images import ImagesView
+from .predictions import PredictionsView
 from .home import HomeView

@@ -11,7 +11,7 @@ UNLABELLED = 255
 LABELS = [UNLABELLED]*N_SAMPLES
 X_DIM = (2, 2)
 N_LABELS = 2
-PATH = 'placeholder'
+PATHS = [f'path/to/file_{idx}' for idx in range(N_SAMPLES)]
 SEED = 1
 
 
@@ -20,7 +20,8 @@ def dm():
     np.random.seed(SEED)
     xs = np.random.rand(N_SAMPLES, *X_DIM)
     ys = np.array(LABELS, dtype=np.uint8)
-    imgs = [Image(x, y, PATH) for x, y in zip(xs, ys)]
+    imgs = [Image(x, y, path, relative=False)
+            for x, y, path in zip(xs, ys, PATHS)]
 
     cm = MagicMock()
     cm.get_dataset_path.return_value = 'undefined'

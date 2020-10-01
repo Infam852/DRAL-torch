@@ -6,7 +6,8 @@ import torch
 
 from dral.data_manipulation.loader import DataLoader, Image
 from dral.config.config_manager import ConfigManager
-from dral.utils import check_dtype
+from dral.utils import check_dtype, extract_name_from_path,\
+        extract_names_from_paths
 from dral.logger import Logger
 from dral.errors import fail_if_len_mismatch
 from dral.utils import show_img, show_grid_imgs
@@ -86,7 +87,18 @@ class ImagesStorage:  # !TODO check dimension when add new samples
         if not all(isinstance(img, Image) for img in imgs):
             raise ValueError('All elements in imgs list have to be'
                              'an instance of Image class')
+        self._validate_paths(imgs)
         self.imgs = imgs
+
+    def _validate_paths(self, imgs):
+        paths = [img.path for img in imgs]
+        if len(paths) != len(set(paths)):
+            raise ValueError('All paths have to be unique!')
+
+    def _fail_if_duplicate_name(self, name):
+        names = [img.name for img in self.imgs]
+        if name in names:
+            raise ValueError('Name of the image has to be unique')
 
     def __getitem__(self, idx):
         return self.imgs[idx]
@@ -156,6 +168,46 @@ class ImagesStorage:  # !TODO check dimension when add new samples
             return self.imgs[idxs].path
 
         return [self.imgs[idx].path for idx in idxs]
+
+    def get_image_with_path(self, path):
+        """Return first image with specified path
+
+        Arguments:
+            path {str} -- Path of the image that we are looking for
+
+        Returns:
+            obj -- Image object with desired path, if not found then
+            return None
+        """
+        img_name = extract_name_from_path(path)
+        for img in self.imgs:
+            if img.name == img_name:
+                return img
+
+    def get_images_with_paths(self, paths):
+        """Iterate over images and return images whose path is the
+        same as one of the passed paths.
+
+        Arguments:
+            paths {list} -- list of paths
+
+        Returns:
+            [type] -- [description]
+        """
+        names = extract_names_from_paths(paths)
+        imgs = []
+        for img in self.imgs:
+            if img.name in names:
+                imgs.append(img)
+        return imgs
+
+    def pop_images_with_paths(self, paths):
+        names = extract_names_from_paths(paths)
+        imgs = []
+        for idx in range(len(self)-1, -1, -1):
+            if self.imgs[idx].name in names:
+                imgs.append(self.imgs.pop(idx))
+        return imgs
 
     def __len__(self):
         return len(self.imgs)

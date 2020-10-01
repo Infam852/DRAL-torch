@@ -27,6 +27,14 @@ cats_dogs_128:
     standarization: False
     strict_balance: False
 
+  preprocessing_npy:
+    grayscale: False
+    rescale_with_crop: True
+    normalization: True
+    centering: True
+    standarization: True
+    strict_balance: False
+
 # !TODO create config to save both png and npy
 # !TODO add numpy save
 # !TODO add npy filename

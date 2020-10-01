@@ -13,12 +13,14 @@
     <title>{% block title %}{% endblock %} - DRAL</title>
 </head>
 <body>
-    <nav>
+    <nav class="text-center">
         <h1>Flask</h1>
     </nav>
     <section class="content">
     <header>
-        {% block header %}{% endblock %}
+        <div class="jumbotron text-center">
+            {% block header %}{% endblock %}
+        </div>
     </header>
         {% for message in get_flashed_messages() %}
             <div class="flash">{{ message }}</div>

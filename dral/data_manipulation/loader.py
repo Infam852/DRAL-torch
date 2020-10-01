@@ -6,7 +6,7 @@ import cv2
 from tqdm import tqdm
 
 from dral.config.config_manager import ConfigManager
-from dral.utils import LOG, check_dtype
+from dral.utils import LOG, check_dtype, extract_name_from_path
 
 
 def one_hot_to_numeric(one_hot):
@@ -49,15 +49,17 @@ class Image:
             y (np.uint8): numeric label
 
             path (str): path where png or jpg representation of an image is
-            stored 
+            stored
+
+            name (str): last part of the path e.g. /path/to/file -> file
 
             convert_to_numpy (bool, optional): if set to True then it
             is possible to pass array like object and it will be converted to
             numpy. Defaults to False.
 
             relative (bool, optional): if set to True then path will be cut so
-            that it starts with static. This operation is necessary for proper
-            loading image in flask. E.g. ./ Defaults to True.
+            that it starts with static directory. This operation is necessary
+            for proper loading image in flask. E.g. ./ Defaults to True.
         """
         if convert_to_numpy:
             x = np.array(x, dtype=np.float32)
@@ -73,12 +75,17 @@ class Image:
         self.x = x
         self.y = y
         self.path = path
+        self.name = extract_name_from_path(path)
 
     def __repr__(self):
         return f'({self.x.shape}) ({self.y}) ({self.path})'
 
     def set_label(self, label):
         self.y = label
+
+    def set_path(self, path):
+        self.path = path
+        self.name = extract_name_from_path(path)
 
 
 class DataLoader:

@@ -96,3 +96,14 @@ def evaluate(model, env):
             obs = env.reset()
     acc = (sum(rewards)/len(rewards))*100
     print(f'Total reward: {sum(rewards)}, accuracy: {acc}%')
+
+
+def extract_name_from_path(path):
+    try:
+        return path.rsplit('/', 1)[1]
+    except IndexError:
+        return path
+
+
+def extract_names_from_paths(paths):
+    return [extract_name_from_path(path) for path in paths]
