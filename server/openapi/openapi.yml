@@ -5,42 +5,61 @@ info:
   version: 0.0.1
 
 components:
-    schemas:
-      Config:
-        type: object
-        properties:
-            name:
-              type: string
-        additionalProperties: true
-        required:
-          - name
+  schemas:
+    Config:
+      type: object
+      properties:
+          name:
+            type: string
+      additionalProperties: true
+      required:
+        - name
 
-      Images:
-        type: array
-        description: Array with indicies of images
-        items:
-          type: integer
+    Images:
+      type: array
+      description: Array with indicies of images
+      items:
+        type: integer
 
-      Labels:
-        type: array
-        description: Array with labels, supported formats are one-hot,
-          label number or string
-        items:
-          oneOf:
-              - type: integer
-              - type: string
-              - type: array
+    Labels:
+      type: array
+      description: Array with labels, supported formats are one-hot,
+        label number or string
+      items:
+        oneOf:
+          - type: integer
+          - type: string
+          - type: array
 
-      LabelledImages:
-        type: object
-        properties:
-            images:
-              $ref: '#/components/schemas/Images'
-            labels:
-              $ref: '#/components/schemas/Labels'
-        required:
-            - images
-            - labels
+    LabelledImages:
+      type: object
+      properties:
+        images:
+          $ref: '#/components/schemas/Images'
+        labels:
+          $ref: '#/components/schemas/Labels'
+      required:
+        - images
+        - labels
+
+    WrongPredictions:
+      description: Dictionary of wrong predictions for both classes.
+      type: object
+      properties:
+        class1:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImagePath"
+        class2:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImagePath"
+
+    ImagePath:
+      description: Path of the image
+      type: string
+      example: path/to/file01.png
+
 
 paths:
   /home:
@@ -121,40 +140,39 @@ paths:
     post:
       summary: Post labels annoted by the user.
       tags:
-          - data
+        - data
       requestBody:
-        description: Two lists, first of them contains indicies of train images
-          and the second one contains corresponding labels.
+        description: pass
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LabelledImages'
+              $ref: '#/components/schemas/WrongPredictions'
       responses:
-          '200':
-            description: Images with labels added to train dataset
+        '200':
+          description: Images with labels added to train dataset
 
     get:
       summary: Show training images
       tags:
-          - data
+        - data
       parameters:
-          - in: query
-            name: labels
-            description: Set to True if you want to show images with labels
-            schema:
-              type: boolean
-          - in: query
-            name: random
-            description: If true, show random images
-            schema:
-              type: boolean
-          - in: query
-            name: maxImages
-            description: Number of images to show
-            schema:
-              type: integer
-            # required: True
+        - in: query
+          name: labels
+          description: Set to True if you want to show images with labels
+          schema:
+            type: boolean
+        - in: query
+          name: random
+          description: If true, show random images
+          schema:
+            type: boolean
+        - in: query
+          name: maxImages
+          description: Number of images to show
+          schema:
+            type: integer
+          # required: True
       # requestBody:
       #   description: Indicies of images to show, if it is specified then 
       #     random parameter should be set to False.

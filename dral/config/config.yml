@@ -7,12 +7,14 @@ cats_dogs_128:
     label_mapping:
       Cat: 0
       Dog: 1
-      Unknown: 'x'
+      Unknown: 255
 
     name_class_delimiter: _  # images will be saved in format <name>_<class_number>
 
   paths:
-    imgs: ./data/PetImages
+    main_dir: ./data/PetImages/Unknown
+    imgs:
+      ./data/PetImages/Unknown: 255
     save: ./server/static/images
 
   loader:

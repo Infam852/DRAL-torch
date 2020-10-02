@@ -7,7 +7,7 @@
 {% block content %}
 <div class="container col-sm-10">
     <div class="row" id="images">
-        <div class="col-sm-6 pr-5">
+        <div class="col-sm-6 pr-5" id="class1">
             <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 1</h1>
             <hr class="mt-2 mb-5">
             <div class="row text-center text-lg-left">
@@ -19,7 +19,7 @@
                 {% endfor %}
             </div>
         </div>
-        <div class="col-sm-6 pl-5">
+        <div class="col-sm-6 pl-5" id="class2">
             <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 2</h1>
             <hr class="mt-2 mb-5">
             <div class="row text-center text-lg-left">
@@ -36,6 +36,10 @@
     </div>
 
     <script>
+
+        class1_node = document.getElementById("class1")
+        class2_node = document.getElementById("class2")
+
         function removeA(arr) {
             var what, a = arguments, L = a.length, ax;
             while (L > 1 && arr.length) {
@@ -47,33 +51,59 @@
             return arr;
         }
 
-        var wrong_predictions = []
+
+        var wrong_predictions = {
+            class1: [],
+            class2: []
+        }
+
+        function push_wrong_prediction(node){
+            if (class1_node.contains(node)){
+                wrong_predictions.class1.push(node.src)
+            }
+            else if (class2_node.contains(node)){
+                wrong_predictions.class2.push(node.src)                
+            }
+            console.log(wrong_predictions)
+        }
+
+        function remove_wrong_prediction(node){
+            if (class1_node.contains(node)){
+                removeA(wrong_predictions.class1, node.src)
+            }
+            else if (class2_node.contains(node)){
+                removeA(wrong_predictions.class2, node.src)
+            }
+            console.log(wrong_predictions)
+        }
+
+
+        function sendPredictions(){
+            $.ajax({
+                url: '/predictions',
+                type: "POST",
+                data: JSON.stringify(wrong_predictions),
+                contentType: "application/json; charset=utf-8",
+                success: function(){
+                    window.location.href = "/predictions";
+                }
+            });
+        }
+
         window.addEventListener("click", function(event) {
             if (event.target.tagName == "IMG") {
                 if (event.target.hasAttribute('selected')) {
                     event.target.removeAttribute('selected')
                     event.target.style.opacity = 1;
-                    removeA(wrong_predictions, event.target.src)
+                    remove_wrong_prediction(event.target)
                 }
                 else {
                     event.target.setAttribute('selected', true)
                     event.target.style.opacity = 0.6;
-                    wrong_predictions.push(event.target.src)
+                    push_wrong_prediction(event.target)
                 }
             }
         });
-
-        function sendPredictions(){
-            $.ajax({
-                url: '/home',
-                type: "POST",
-                data: JSON.stringify({x: wrong_predictions}),
-                contentType: "application/json; charset=utf-8",
-                success: function(){
-                    window.location.href = "/home";
-                }
-            });
-        }
         
     </script>
 </div>

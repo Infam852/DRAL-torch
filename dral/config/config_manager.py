@@ -46,8 +46,11 @@ class ConfigManager:
     def get_number_of_labels(self):
         return len(self.get_label_names())
 
-    def get_imgs_path(self):
+    def get_imgs_path_to_label(self):
         return self.config['paths']['imgs'].get()
+
+    def get_main_imgs_dir(self):  # !TODO
+        return self.config['paths']['main_dir'].get(str)
 
     def get_save_path(self):
         return self.config['paths']['save'].get(str)
@@ -87,9 +90,8 @@ class ConfigManager:
             raise ValueError(f'There is no {UNKNOWN_LABEL} in labels names')
         return self.get_label_mapping()[UNKNOWN_LABEL]
 
-    def get_class_paths(self):
-        return [os.path.join(self.get_imgs_path(), label)
-                for label in self.get_label_names()]
+    def get_classes_dirs(self):
+        return list(self.get_imgs_path_to_label().keys())
 
     def get_one_hot_labels(self):
         labels = []

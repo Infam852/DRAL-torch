@@ -67,6 +67,9 @@ class DatasetsManager:
         self.train.append(imgs)
         self.labelled.append(imgs)
 
+    def label_samples_with_specified_label(self, idxs, label):
+        self.label_samples(idxs, [label]*len(idxs))
+
     def __str__(self):
         msg = """
         Number of unlabelled samples: {}
@@ -201,6 +204,14 @@ class ImagesStorage:  # !TODO check dimension when add new samples
                 imgs.append(img)
         return imgs
 
+    def get_indicies_from_paths(self, paths):
+        names = extract_names_from_paths(paths)
+        idxs = []
+        for idx, img in enumerate(self.imgs):
+            if img.name in names:
+                idxs.append(idx)
+        return idxs
+
     def pop_images_with_paths(self, paths):
         names = extract_names_from_paths(paths)
         imgs = []
@@ -214,12 +225,13 @@ class ImagesStorage:  # !TODO check dimension when add new samples
 
 
 if __name__ == "__main__":
-    cm = ConfigManager('testset')
-    imgs = DataLoader.load_images(cm.get_relative_dataset_path())
-
+    cm = ConfigManager('cats_dogs_128')
+    print(cm.get_dataset_path())
+    imgs = DataLoader.load_images(cm.get_dataset_path())
     dm = DatasetsManager(cm, imgs)
-    labels = [0, 1, 1, 0]
-    dm.label_samples([0, 1, 2, 3], labels)
-    img = DataLoader.load_image(dm.unl.get_path(110))
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)   # cv2 uses BGR format
-    show_img(img)
+
+    # labels = [0, 1, 1, 0]
+    # dm.label_samples([0, 1, 2, 3], labels)
+    # img = DataLoader.load_image(dm.unl.get_path(110))
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)   # cv2 uses BGR format
+    # show_img(img)

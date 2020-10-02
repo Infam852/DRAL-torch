@@ -1,6 +1,7 @@
 import os
-from pathlib import Path
 import numpy as np
+from pathlib import Path
+from shutil import copyfile
 
 import cv2
 from tqdm import tqdm
@@ -34,6 +35,20 @@ def get_number_of_files(path, recursively=True):  # !TODO optimize
         else:
             n_files += 1
     return n_files
+
+
+def move_and_rename(src_path, dst_path, start_idx):
+    name = start_idx
+    for f in os.listdir(src_path):
+        full_src_path = os.path.join(src_path, f)
+
+        if os.path.isfile(full_src_path):
+            _, ext = f.rsplit('.', 1)
+            filename = f'{name}.{ext}'
+            full_dst_path = os.path.join(dst_path, filename)
+            copyfile(full_src_path, full_dst_path)
+            name += 1
+    return name
 
 
 class Image:
@@ -89,7 +104,7 @@ class Image:
 
 
 class DataLoader:
-    def __init__(self, cm, max_imgs=None):
+    def __init__(self, cm, max_imgs=50000):
         """Initialize data loader with specification saved in CONFIG dictionary
 
         Args:
@@ -102,9 +117,7 @@ class DataLoader:
         self.cm = cm
         self.IMG_SIZE = cm.get_img_size()
         self.N_LABELS = len(cm.get_label_names())
-        self.MAX_IMGS = max_imgs if max_imgs \
-            else get_number_of_files(cm.get_imgs_path())
-        self.MAX_IMGS_PER_CLASS = self.MAX_IMGS // self.N_LABELS
+        self.MAX_IMGS = max_imgs
         self._reset()
 
     def _reset(self):
@@ -123,15 +136,18 @@ class DataLoader:
     def load_raw(self):
         """ Load images and apply preprocessing on them based on config file
         """
-        paths = self.cm.get_class_paths()
-        labels = self.cm.get_numeric_labels()
-        print(labels)
+        paths = list(self.cm.get_imgs_path_to_label().keys())
+        labels = list(self.cm.get_imgs_path_to_label().values())
         self._fail_if_path_is_not_dir(paths)
         self._reset()
-        for ctr, (label, class_path) in enumerate(zip(labels, paths)):
+        self.MAX_IMGS_PER_CLASS = self.MAX_IMGS // len(paths)
+
+        k = 0
+        for ctr, (class_path, label) in enumerate(zip(paths, labels)):
             LOG.info(f'Start loading images from path: {class_path}...')
-            for k, f in tqdm(enumerate(os.listdir(class_path))):
-                if self.MAX_IMGS_PER_CLASS and k >= self.MAX_IMGS_PER_CLASS:
+            print(len(os.listdir(class_path)))
+            for f in tqdm(os.listdir(class_path)):
+                if k >= self.MAX_IMGS_PER_CLASS:
                     LOG.info(
                         f'Maximum number of load attemps is reached ({k})'
                         f' for class {label}')
@@ -142,6 +158,8 @@ class DataLoader:
                     color_mode = cv2.IMREAD_GRAYSCALE \
                         if self.cm.do_grayscale() else cv2.IMREAD_COLOR
                     img = cv2.imread(path, flags=color_mode)
+                    if img is None:
+                        raise OSError('Failed to read an image')
                     img = self._rescale(img)
 
                     if self.cm.do_normalization():
@@ -154,10 +172,11 @@ class DataLoader:
                     if self.cm.do_standarization():
                         img /= img.std()
 
-                    self._x[ctr*self.MAX_IMGS + k] = img
-                    self._y[ctr*self.MAX_IMGS + k] = label
+                    self._x[k] = img
+                    self._y[k] = label
 
                     self.balance_counter[self.cm.get_label_name(ctr)] += 1
+                    k += 1
 
                 except OSError as e:
                     LOG.warning(
@@ -239,7 +258,7 @@ class DataLoader:
         for path in paths:
             if not os.path.isdir(path):
                 raise Exception(f'Path {path} is not directory '
-                                'or even does not exist')  # !TODO change type of exception
+                                'or even does not exist'.format(path))  # !TODO change type of exception
 
     def _rescale(self, img):   # !TODO optimalization
         """Rescale image to the specified in config file size.
@@ -338,8 +357,8 @@ class DataLoader:
 
 
 if __name__ == '__main__':
-    cm = ConfigManager('testset')
-    dl = DataLoader(cm)
+    cm = ConfigManager('cats_dogs_128')
+    dl = DataLoader(cm, max_imgs=15000)
     dl.load_raw()
     dl.print_balance_counter()
     dl.save(force=True, as_png=True)
@@ -349,3 +368,7 @@ if __name__ == '__main__':
     dl.load_raw()
     dl.print_balance_counter()
     dl.save(force=True)
+    # idx = move_and_rename('/home/dawid/project/DRAL-torch/data/PetImages/Dog',
+    #                       '/home/dawid/project/DRAL-torch/data/PetImages/Unknown',
+    #                       12501)
+    # print(idx)
