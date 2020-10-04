@@ -11,9 +11,9 @@
             <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 1</h1>
             <hr class="mt-2 mb-5">
             <div class="row text-center text-lg-left">
-                {% for image_name in image_names %}
+                {% for image in images %}
                 <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
-                    <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+                    <img  data-idx="{{ image.idx }}" class="img-fluid img-thumbnail" src="{{ image.path }}" alt="" width=128 height=128>
                 </div>
                 
                 {% endfor %}
@@ -23,16 +23,23 @@
             <h1 class="font-weight-light text-center text-lg-left mt-4 mb-0">Label 2</h1>
             <hr class="mt-2 mb-5">
             <div class="row text-center text-lg-left">
-                {% for image_name in image_names %}
+                {% for image in images %}
                 <div class="col-lg-2 col-md-3 col-4 m-0 p-1">
-                    <img class="img-fluid img-thumbnail" src="{{ image_name }}" alt="" width=128 height=128>
+                    <img data-idx="{{ image.idx }}" class="img-fluid img-thumbnail" src="{{ image.path }}" alt="" width=128 height=128>
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
-    <div>
+    {# <div>
         <button class="btn" type="button" onclick="sendPredictions()">Click</button>
+    </div> #}
+    
+    <div class="mt-4">
+        <div class="col-sm-12 text-center">
+            <button type="button" onclick="sendPredictions()" class="btn btn-secondary m-2">Add train samples</button>
+            <button type="button" class="btn btn-secondary m-2">Middle</button>
+        </div>
     </div>
 
     <script>
@@ -59,20 +66,20 @@
 
         function push_wrong_prediction(node){
             if (class1_node.contains(node)){
-                wrong_predictions.class1.push(node.src)
+                wrong_predictions.class1.push(node.getAttribute("data-idx"))
             }
             else if (class2_node.contains(node)){
-                wrong_predictions.class2.push(node.src)                
+                wrong_predictions.class2.push(node.getAttribute("data-idx"))                
             }
-            console.log(wrong_predictions)
+            console.log(wrong_predictions)  
         }
 
         function remove_wrong_prediction(node){
             if (class1_node.contains(node)){
-                removeA(wrong_predictions.class1, node.src)
+                removeA(wrong_predictions.class1, node.getAttribute("data-idx"))
             }
             else if (class2_node.contains(node)){
-                removeA(wrong_predictions.class2, node.src)
+                removeA(wrong_predictions.class2, node.getAttribute("data-idx"))
             }
             console.log(wrong_predictions)
         }

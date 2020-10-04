@@ -1,7 +1,10 @@
 from flask.views import MethodView
 from flask import render_template, url_for, request, redirect
 
-from server.app_utils import get_dm, get_cm
+from server.app_utils import cm, dm
+from dral.data_manipulation.loader import DataLoader
+from dral.data_manipulation.image_viewer import create_images
+from dral.utils import show_grid_imgs
 
 
 class PredictionsView(MethodView):
@@ -9,27 +12,35 @@ class PredictionsView(MethodView):
     def search(self):
         import time
         start = time.time()
-        idxs = list(range(10))
-        dm = get_dm()
-        paths = dm.unl.get_path(idxs)
+        self._get_predictions()
+        # mock predictions
+        idxs = [1, 2, 50, 100, 160, 180, 11, 232]
+        imgs = dm.unl.get(idxs)
+        images = create_images(imgs, idxs,
+                               cm.get_dataset_path(),
+                               cm.get_unprocessed_x_name(),
+                               cm.get_tmp_dir())
         end = time.time()
         print('time: ', end-start)
-        return render_template("predictions.html.j2", image_names=paths), 200
+        return render_template("predictions.html.j2", images=images), 200
 
     def post(self):
-        class1_paths = request.json['class1']
-        class2_paths = request.json['class2']
-        cm = get_cm()
+        class1_idxs = [int(idx) for idx in request.json['class1']]
+        class2_idxs = [int(idx) for idx in request.json['class2']]
         labels = cm.get_numeric_labels()
-        dm = get_dm()
-        imgs1 = dm.unl.get_indicies_from_paths(class1_paths)
-        imgs2 = dm.unl.get_indicies_from_paths(class2_paths)
+        print(dm)
+        print("class1 idxs:", class1_idxs)
+        print("class2 idxs:", class2_idxs)
         # add to training data
-        dm.label_samples_with_specified_label(imgs1, labels[0])
-        dm.label_samples_with_specified_label(imgs1, labels[1])
+        dm.label_samples_mapping({labels[0]: class1_idxs,
+                                  labels[1]: class2_idxs})
         print(dm)
         # do training and pass imgs
+        imgs = dm.train.get_x(list(range(4)))
+        labels = dm.train.get_y(list(range(4)))
+        show_grid_imgs(imgs, labels, (2, 2))
 
-        print(imgs1)
-        print(imgs2)
         return redirect(url_for('.views_PredictionsView_search'))
+
+    def _get_predictions(self):
+        pass

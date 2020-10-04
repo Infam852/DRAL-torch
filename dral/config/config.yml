@@ -18,7 +18,7 @@ cats_dogs_128:
     save: ./server/static/images
 
   loader:
-    shuffle: True
+    shuffle: False
     label_format: one-hot
 
   preprocessing:
@@ -47,12 +47,17 @@ testset:
   general:
     image_size: 128
     label_mapping:
+      Cat: 0
+      Dog: 1
       Unknown: 255
 
     name_class_delimiter: _  # images will be saved in format <name>_<class_number>
 
   paths:
-    imgs: ./data/TestImages
+    main_dir: ./data/PetImages/Unknown
+    imgs:
+      ./data/PetImages/Cat: 0
+      ./data/PetImages/Dog: 1
     save: ./server/static/images
 
   loader:

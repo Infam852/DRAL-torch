@@ -1,7 +1,7 @@
 import numpy as np
 import os
+import random
 
-import cv2
 import torch
 
 from dral.data_manipulation.loader import DataLoader, Image
@@ -24,8 +24,9 @@ class DatasetsManager:
         self.cm = cm
         self.BASEPATH = self.cm.get_dataset_path()
         self.DELIMITER = self.cm.get_name_class_delimiter()
+
         self.unl, self.labelled = self.split_images(imgs)
-        self.train = ImagesStorage([])
+        self.train = ImagesStorage(self.labelled)
         self.eval = ImagesStorage([])
         self.test = ImagesStorage([])
 
@@ -67,16 +68,23 @@ class DatasetsManager:
         self.train.append(imgs)
         self.labelled.append(imgs)
 
-    def label_samples_with_specified_label(self, idxs, label):
-        self.label_samples(idxs, [label]*len(idxs))
+    def label_samples_mapping(self, label_idx_mapping):
+        all_idxs = []
+        all_labels = []
+        for label, idxs in label_idx_mapping.items():
+            all_idxs.extend(idxs)
+            all_labels.extend([label]*len(idxs))
+
+        self.label_samples(all_idxs, all_labels)
 
     def __str__(self):
         msg = """
         Number of unlabelled samples: {}
         Number of labelled samples: {}
+        Number of training samples: {}
         Number of evaluation samples: {}
         Number of test samples: {}
-        """.format(len(self.unl), len(self.train),
+        """.format(len(self.unl), len(self.labelled), len(self.train),
                    len(self.eval), len(self.test))
         return msg
 
@@ -86,22 +94,24 @@ class DatasetsManager:
 
 
 class ImagesStorage:  # !TODO check dimension when add new samples
-    def __init__(self, imgs):
-        if not all(isinstance(img, Image) for img in imgs):
-            raise ValueError('All elements in imgs list have to be'
-                             'an instance of Image class')
-        self._validate_paths(imgs)
+    def __init__(self, imgs, return_tensors=True):
         self.imgs = imgs
+        self.return_tensors = return_tensors
 
-    def _validate_paths(self, imgs):
-        paths = [img.path for img in imgs]
-        if len(paths) != len(set(paths)):
-            raise ValueError('All paths have to be unique!')
+    # def conditional_decorator(dec, condition):
+    #     def decorator(func):
+    #         if not condition:
+    #             # Return the function unchanged, not decorated.
+    #             return func
+    #         return dec(func)
+    #     return decorator
 
-    def _fail_if_duplicate_name(self, name):
-        names = [img.name for img in self.imgs]
-        if name in names:
-            raise ValueError('Name of the image has to be unique')
+    def to_tensor(func):
+        def inner(*args, **kwargs):
+            a = func(*args, **kwargs)
+            print(a[0:2])
+            return torch.Tensor(a)
+        return inner
 
     def __getitem__(self, idx):
         return self.imgs[idx]
@@ -122,14 +132,17 @@ class ImagesStorage:  # !TODO check dimension when add new samples
     @staticmethod
     def set_labels(imgs, labels):
         fail_if_len_mismatch(imgs, labels)
-        for imgs, label in zip(imgs, labels):
-            imgs.y = label
+        for img, label in zip(imgs, labels):
+            img.y = label
 
     def sample(self, n):
         pass
 
-    def get(self, idxs=-1):
+    def get(self, idxs=-1, start=0, end=0):
         check_dtype(idxs, int, list, np.ndarray)
+
+        if start and end:
+            return [self.imgs[k] for k in range(start, end)]
 
         if isinstance(idxs, int) and idxs < 0:
             return self.imgs
@@ -139,8 +152,11 @@ class ImagesStorage:  # !TODO check dimension when add new samples
 
         return [self.imgs[idx] for idx in idxs]
 
-    def get_x(self, idxs=-1):
+    def get_x(self, idxs=-1, start=0, end=0):
         check_dtype(idxs, int, list, np.ndarray)
+
+        if start and end:
+            return [self.imgs[k].x for k in range(start, end)]
 
         if isinstance(idxs, int) and idxs < 0:
             return [img.x for img in self.imgs]
@@ -150,8 +166,11 @@ class ImagesStorage:  # !TODO check dimension when add new samples
 
         return [self.imgs[idx].x for idx in idxs]
 
-    def get_y(self, idxs=-1):
+    def get_y(self, idxs=-1, start=0, end=0):
         check_dtype(idxs, int, list, np.ndarray)
+
+        if start and end:
+            return [self.imgs[k].y for k in range(start, end)]
 
         if isinstance(idxs, int) and idxs < 0:
             return [img.y for img in self.imgs]
@@ -161,74 +180,37 @@ class ImagesStorage:  # !TODO check dimension when add new samples
 
         return [self.imgs[idx].y for idx in idxs]
 
-    def get_path(self, idxs=-1):
-        check_dtype(idxs, int, list, np.ndarray)
-
-        if isinstance(idxs, int) and idxs < 0:
-            return [img.path for img in self.imgs]
-
-        if isinstance(idxs, int):
-            return self.imgs[idxs].path
-
-        return [self.imgs[idx].path for idx in idxs]
-
-    def get_image_with_path(self, path):
-        """Return first image with specified path
-
-        Arguments:
-            path {str} -- Path of the image that we are looking for
-
-        Returns:
-            obj -- Image object with desired path, if not found then
-            return None
+    def shuffle(self):
+        """ Shuffle all of the loaded images. Does not check if
+        images were loaded.
         """
-        img_name = extract_name_from_path(path)
-        for img in self.imgs:
-            if img.name == img_name:
-                return img
-
-    def get_images_with_paths(self, paths):
-        """Iterate over images and return images whose path is the
-        same as one of the passed paths.
-
-        Arguments:
-            paths {list} -- list of paths
-
-        Returns:
-            [type] -- [description]
-        """
-        names = extract_names_from_paths(paths)
-        imgs = []
-        for img in self.imgs:
-            if img.name in names:
-                imgs.append(img)
-        return imgs
-
-    def get_indicies_from_paths(self, paths):
-        names = extract_names_from_paths(paths)
-        idxs = []
-        for idx, img in enumerate(self.imgs):
-            if img.name in names:
-                idxs.append(idx)
-        return idxs
-
-    def pop_images_with_paths(self, paths):
-        names = extract_names_from_paths(paths)
-        imgs = []
-        for idx in range(len(self)-1, -1, -1):
-            if self.imgs[idx].name in names:
-                imgs.append(self.imgs.pop(idx))
-        return imgs
+        random.shuffle(self.imgs)
+        LOG.info('Data was shuffled')
 
     def __len__(self):
         return len(self.imgs)
 
+    def get_shape(self):
+        return self.imgs[0].x.shape if self.imgs else None
+
 
 if __name__ == "__main__":
-    cm = ConfigManager('cats_dogs_128')
+    cm = ConfigManager('testset')
     print(cm.get_dataset_path())
-    imgs = DataLoader.load_images(cm.get_dataset_path())
+    imgs = DataLoader.get_images_objects(
+        cm.get_dataset_path(), 'processed_x.npy',
+        'processed_y.npy', to_tensor=True)
+
     dm = DatasetsManager(cm, imgs)
+    dm.labelled.shuffle()
+    print(dm)
+    imgs = dm.labelled.get(list(range(0, 9)))
+
+    show_grid_imgs(
+        [img.x for img in imgs],
+        [img.y for img in imgs],
+        (3, 3)
+    )
 
     # labels = [0, 1, 1, 0]
     # dm.label_samples([0, 1, 2, 3], labels)

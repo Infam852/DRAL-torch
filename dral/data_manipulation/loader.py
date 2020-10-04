@@ -4,6 +4,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import cv2
+import torch
 from tqdm import tqdm
 
 from dral.config.config_manager import ConfigManager
@@ -37,11 +38,13 @@ def get_number_of_files(path, recursively=True):  # !TODO optimize
     return n_files
 
 
-def move_and_rename(src_path, dst_path, start_idx):
+def move_and_rename(src_path, dst_path, start_idx, max_files=None):
     name = start_idx
-    for f in os.listdir(src_path):
-        full_src_path = os.path.join(src_path, f)
+    for k, f in enumerate(os.listdir(src_path)):
+        if max_files and k > max_files:
+            break
 
+        full_src_path = os.path.join(src_path, f)
         if os.path.isfile(full_src_path):
             _, ext = f.rsplit('.', 1)
             filename = f'{name}.{ext}'
@@ -54,8 +57,8 @@ def move_and_rename(src_path, dst_path, start_idx):
 class Image:
     IMG_PATTERN = '{name}_{label}.{ext}'
 
-    def __init__(self, x, y, path, convert_to_numpy=False, relative=True):
-        """Image representation
+    def __init__(self, x, y, idx, convert_to_numpy=False):
+        """Image with label representation
 
         Args:
             x (np.ndarray): representation of an image as 3d array, where third
@@ -63,44 +66,35 @@ class Image:
 
             y (np.uint8): numeric label
 
-            path (str): path where png or jpg representation of an image is
-            stored
-
-            name (str): last part of the path e.g. /path/to/file -> file
+            idx (int): index of an image from numpy that was loaded, important
+            when accessing unprocessed image
 
             convert_to_numpy (bool, optional): if set to True then it
             is possible to pass array like object and it will be converted to
             numpy. Defaults to False.
-
-            relative (bool, optional): if set to True then path will be cut so
-            that it starts with static directory. This operation is necessary
-            for proper loading image in flask. E.g. ./ Defaults to True.
         """
         if convert_to_numpy:
             x = np.array(x, dtype=np.float32)
             y = np.array(y, dtype=np.uint8)
 
-        if relative:
-            idx = path.index('static')
-            path = path[idx:]
-
-        check_dtype(x, np.ndarray)
-        check_dtype(y, np.uint8)
+        check_dtype(x, np.ndarray, torch.Tensor)
+        check_dtype(y, np.uint8, torch.Tensor)
 
         self.x = x
         self.y = y
-        self.path = path
-        self.name = extract_name_from_path(path)
-
-    def __repr__(self):
-        return f'({self.x.shape}) ({self.y}) ({self.path})'
+        self.idx = idx
 
     def set_label(self, label):
         self.y = label
 
-    def set_path(self, path):
-        self.path = path
-        self.name = extract_name_from_path(path)
+    def __repr__(self):
+        return f'({self.x.shape}) ({self.y}) ({self.idx})'
+
+
+class TensorImage(Image):
+    def __init__(self, x, y, idx, shape=(-1, 3, 128, 128)):
+        x = torch.Tensor(x).unsqueeze(0).view(shape)
+        super(TensorImage, self).__init__(x, y, idx)
 
 
 class DataLoader:
@@ -121,19 +115,23 @@ class DataLoader:
         self._reset()
 
     def _reset(self):
-        color_channels = 1 if self.cm.do_grayscale() else 3
+        color_channels = self._get_channels_number()
         dtype = np.float32 if cm.do_normalization() else np.uint8
 
         self._x = np.zeros(
             (self.MAX_IMGS, self.IMG_SIZE, self.IMG_SIZE, color_channels),
             dtype=dtype)
         self._y = np.zeros(self.MAX_IMGS, dtype=np.uint8)
+        self.path = []
 
         self.balance_counter = \
             {label: 0 for label in self.cm.get_label_names()}
         self.n_exceptions_while_loading = 0
 
-    def load_raw(self):
+    def _get_channels_number(self):
+        return 1 if self.cm.do_grayscale() else 3
+
+    def load_raw(self):  #!TODO prepare 2 arrays processed and only reshaped
         """ Load images and apply preprocessing on them based on config file
         """
         paths = list(self.cm.get_imgs_path_to_label().keys())
@@ -145,9 +143,9 @@ class DataLoader:
         k = 0
         for ctr, (class_path, label) in enumerate(zip(paths, labels)):
             LOG.info(f'Start loading images from path: {class_path}...')
-            print(len(os.listdir(class_path)))
+
             for f in tqdm(os.listdir(class_path)):
-                if k >= self.MAX_IMGS_PER_CLASS:
+                if k >= self.MAX_IMGS_PER_CLASS * (ctr + 1):
                     LOG.info(
                         f'Maximum number of load attemps is reached ({k})'
                         f' for class {label}')
@@ -157,13 +155,15 @@ class DataLoader:
 
                     color_mode = cv2.IMREAD_GRAYSCALE \
                         if self.cm.do_grayscale() else cv2.IMREAD_COLOR
-                    img = cv2.imread(path, flags=color_mode)
+                    img = cv2.imread(path, flags=color_mode)  # reads as bgr
+
                     if img is None:
                         raise OSError('Failed to read an image')
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     img = self._rescale(img)
 
                     if self.cm.do_normalization():
-                        img = cv2.normalize(img,  img, 0, 1, cv2.NORM_MINMAX,
+                        img = cv2.normalize(img, img, 0, 1, cv2.NORM_MINMAX,
                                             dtype=cv2.CV_32F)
 
                     if self.cm.do_centering():
@@ -194,7 +194,7 @@ class DataLoader:
         LOG.info('Data was shuffled')
 
     def save(self, save_path=None, force=False,
-             as_png=False, png_and_npy=False):
+             as_png=False, as_tensor=False, filename='{}.npy'):
         """Save loaded images to the specified in config path (by default as
         numpy array). If path does not exist and force is set to false then
         exception is raised. Otherwise create required directories and then
@@ -234,10 +234,21 @@ class DataLoader:
                 img_path = os.path.join(path, filename)
                 cv2.imwrite(img_path, img)
                 LOG.debug(f'save image: {img_path}')
+        elif as_tensor:
+            color_channels = self._get_channels_number()
+
+            torch.save(torch.Tensor(self._x).view(
+                -1, color_channels, self.IMG_SIZE, self.IMG_SIZE),
+                os.path.join(path, filename.format('x')))
+            torch.save(torch.Tensor(self._y),
+                       os.path.join(path, filename.format('y')))
         else:
-            np.save(f'{path}/x.npy', self._x)
-            np.save(f'{path}/y.npy', self._y)
+            np.save(os.path.join(path, filename.format('x'), self._x))
+            np.save(os.path.join(path, filename.format('y'), self._y))
         LOG.info(f'Data was saved in directory {path}')
+
+    def _create_path_if_does_not_exists(self, path):
+        Path(path).mkdir(parents=True, exist_ok=True)
 
     def print_balance_counter(self):
         if sum(self.balance_counter.values()):
@@ -306,18 +317,20 @@ class DataLoader:
         return np.load(path, allow_pickle=True)
 
     @staticmethod
-    def load_images(path, ext='png'):
-        x = DataLoader.load_npy(path, 'x.npy')
-        y = DataLoader.load_npy(path, 'y.npy')
-        images = []
-        for k in range(len(x)):
-            img_path = os.path.join(
-                path, Image.IMG_PATTERN.format(name=k, label=y[k], ext=ext))
-            if not os.path.isfile(img_path):
-                raise Exception(f'Path {img_path} does not exist')
-            images.append(Image(x[k], y[k], img_path))
-        LOG.info(f'{len(images)} images have been loaded')
-        return images
+    def load_torch(prefix, sufix):
+        path = os.path.join(prefix, sufix)
+        return torch.load(path)
+
+    @staticmethod
+    def get_images_objects(path, xfilename, yfilename, to_tensor=False):
+        if to_tensor:
+            x = DataLoader.load_torch(path, xfilename)
+            y = DataLoader.load_torch(path, yfilename)
+            return [TensorImage(x[k], y[k], idx=k) for k in range(len(x))]
+        else:
+            x = DataLoader.load_npy(path, xfilename)
+            y = DataLoader.load_npy(path, yfilename)
+            return [Image(x[k], y[k], idx=k) for k in range(len(x))]        
 
     @staticmethod
     def load_image(path, color_mode=cv2.IMREAD_COLOR, convert_to_rgb=True):
@@ -356,19 +369,27 @@ class DataLoader:
         return self._y
 
 
+def copy_test_data(n):
+    half = n // 2
+    move_and_rename('/home/dawid/projects/DRAL/data/PetImages/Cat',
+                    '/home/dawid/projects/DRAL/data/PetImages/Unknown',
+                    0, half)
+    move_and_rename('/home/dawid/projects/DRAL/data/PetImages/Dog',
+                    '/home/dawid/projects/DRAL/data/PetImages/Unknown',
+                    half, n)
+
+
 if __name__ == '__main__':
-    cm = ConfigManager('cats_dogs_128')
-    dl = DataLoader(cm, max_imgs=15000)
+    # copy_test_data((5000))
+
+    cm = ConfigManager('testset')
+    dl = DataLoader(cm, max_imgs=5000)
     dl.load_raw()
     dl.print_balance_counter()
-    dl.save(force=True, as_png=True)
+    dl.save(force=True, as_tensor=True, filename='not_processed_{}.pt')
 
     cm.enable_npy_preprocessing(True)
 
     dl.load_raw()
     dl.print_balance_counter()
-    dl.save(force=True)
-    # idx = move_and_rename('/home/dawid/project/DRAL-torch/data/PetImages/Dog',
-    #                       '/home/dawid/project/DRAL-torch/data/PetImages/Unknown',
-    #                       12501)
-    # print(idx)
+    dl.save(force=True, as_tensor=True, filename='processed_{}.pt')

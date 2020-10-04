@@ -85,6 +85,34 @@ class ConfigManager:
     def get_config_name(self):
         return self.config_name
 
+    # !TODO move to config
+    def get_unprocessed_x_name(self):
+        return 'unprocessed_x.npy'
+
+    def get_unprocessed_y_name(self):
+        return 'unprocessed_y.npy'
+
+    def get_processed_x_name(self):
+        return 'processed_x.npy'
+
+    def get_processed_y_name(self):
+        return 'processed_y.npy'
+
+    def get_processed_xpath(self):
+        return os.path.join(self.get_dataset_path(),
+                            self.get_processed_x_name())
+
+    def get_processed_ypath(self):
+        return os.path.join(self.get_dataset_path(),
+                            self.get_processed_y_name())
+
+    def get_unprocessed_path(self):
+        return os.path.join(self.get_dataset_path(),
+                            self.get_unprocessed_x_name())
+
+    def get_tmp_dir(self):
+        return 'tmp'
+
     def get_unknown_label(self):
         if UNKNOWN_LABEL not in self.get_label_names():
             raise ValueError(f'There is no {UNKNOWN_LABEL} in labels names')
